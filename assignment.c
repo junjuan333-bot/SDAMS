@@ -14,6 +14,14 @@ struct Inventory {
     double unitCost; 
     char status[20]; 
 };
+struct FacilityProblem {
+    char problemID[10];
+    char description[100];
+    char status[20];
+    char reportedBy[50];
+    char reportedDate[20];
+    char facilityName[50];
+};
 int isStrongPassword(char pass[]) {
     int hasUpper = 0;
     int hasLower = 0;
@@ -78,7 +86,7 @@ int manager_log_system(char loggedInId[]) {
     return found;
 }
 
-int manager_register(void) {
+int manager_register() {
     struct User newUser;
     struct User checkUser;
    
@@ -224,7 +232,7 @@ double getRestockUnitCost(char targetId[]) {
     fclose(fp);
     return -1.0; 
 }
-int approve_Restock(void){
+int approve_Restock(char currentId[]){
     struct Inventory fileData;
     int needRestock = 0;
     char approveId[10];
@@ -345,7 +353,177 @@ int approve_Restock(void){
 
     printf("[OK] Restock approved for %s! Added %d units (Total: RM %.2f).\n",
            approveId, restockQuantity, totalCost);
+    FILE *histFp = fopen("restock_history.txt", "a");
+    if (histFp != NULL) {
+        fprintf(histFp, "%s|%d|%.2f|%s\n", approveId, restockQuantity, totalCost, currentId);
+        fclose(histFp);
+    }
     return 1;
+}
+
+int Unresolved_Problems() {
+    struct FacilityProblem fileData;
+    int count=0;
+FILE*fc=fopen("facility_problems.txt","r");
+if(fc==NULL){
+    printf("Error opening file.\n");
+    return 0;
+}
+while (fscanf(fc, "%[^|]|%[^|]|%[^|]|%[^|]|%[^|]|%[^\n]\n",
+              fileData.problemID, fileData.facilityName, fileData.description,
+              fileData.reportedBy, fileData.reportedDate, fileData.status) == 6) {
+    if ((isSameIgnoreCase(fileData.status, "Resolved") == 0)) {
+        printf("\n-----------------------------\n");
+        printf("Problem ID: %s\n", fileData.problemID);
+        printf("Description: %s\n", fileData.description);
+        printf("Status: %s\n", fileData.status);
+        printf("Reported By: %s\n", fileData.reportedBy);
+        printf("Reported Date: %s\n", fileData.reportedDate);
+        printf("Facility Name: %s\n", fileData.facilityName);
+        printf("-----------------------------\n");
+        count++;
+    }
+}
+fclose(fc);
+if (count == 0) {
+    printf("No unresolved facility problems found.\n");
+} else {
+    printf("\nTotal Unresolved Problems: %d\n", count);
+}
+return 1;
+}
+int overall_facility(){
+    struct Inventory fileData;
+    struct FacilityProblem fileDatae;
+    int totalItems = 0, totalUnits = 0, alertCount = 0;
+    double totalValue = 0.0;
+    int totalProblems = 0, unresolvedCount = 0, resolvedCount = 0;
+    FILE *fi = fopen("inventory.txt", "r");
+    FILE *fp = fopen("facility_problems.txt", "r");
+
+    if (fi == NULL || fp == NULL) {
+        printf("Error opening files.\n");
+        if (fi != NULL) fclose(fi);
+        if (fp != NULL) fclose(fp);
+        return 0;
+    }
+    printf("\n==================== INVENTORY OVERVIEW ====================\n");
+    while(fscanf(fi, "%[^|]|%[^|]|%[^|]|%d|%lf|%[^\n]\n",
+                  fileData.id, fileData.name, fileData.category,
+                  &fileData.quantity, &fileData.unitCost, fileData.status) == 6) {
+                    totalItems++;
+        totalUnits += fileData.quantity;
+        totalValue += fileData.quantity * fileData.unitCost;
+        if (fileData.quantity < 5 || (isSameIgnoreCase(fileData.status, "Low Stock") == 1 || isSameIgnoreCase(fileData.status, "Damaged") == 1)) {
+            printf("\n[Restock Needed] %s (%s) - Quantity: %d, Status: %s\n",
+                   fileData.name, fileData.id, fileData.quantity, fileData.status);
+            alertCount++;
+            
+        }
+    else {
+        printf("[Normal]         %s | %s | %s | %d | RM %.2f | %s\n",
+                   fileData.id, fileData.name, fileData.category,
+                   fileData.quantity, fileData.unitCost, fileData.status);
+    }
+}
+printf("\n================ FACILITY PROBLEMS OVERVIEW ================\n");
+    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%19[^|]|%19[^\n]\n",
+                  fileDatae.problemID, fileDatae.facilityName, fileDatae.description,
+                  fileDatae.reportedBy, fileDatae.reportedDate, fileDatae.status) == 6) {
+        
+        totalProblems++;
+        printf("%s | %s | %s | %s | %s | %s\n",
+               fileDatae.problemID, fileDatae.facilityName, fileDatae.description,
+               fileDatae.reportedBy, fileDatae.reportedDate, fileDatae.status);
+
+        if (isSameIgnoreCase(fileDatae.status, "Resolved") == 0) {
+            unresolvedCount++;
+        } else {
+            resolvedCount++;
+        }
+    }
+
+    fclose(fi);
+    fclose(fp);
+    printf("\n====================== OVERALL SUMMARY =====================\n");
+    printf("Total Equipment Types     : %d\n", totalItems);
+    printf("Total Physical Units      : %d\n", totalUnits);
+    printf("Total Inventory Valuation : RM %.2f\n", totalValue);
+    printf("Low Stock / Damaged Items : %d\n", alertCount);
+    printf("------------------------------------------------------------\n");
+    printf("Total Facility Problems   : %d\n", totalProblems);
+    printf("Unresolved Problems       : %d\n", unresolvedCount);
+    printf("Resolved Problems         : %d\n", resolvedCount);
+    printf("============================================================\n");
+    return 1;
+}
+void view_restock_history() {
+    char itemId[10], approvedBy[50];
+    int qty, count = 0;
+    double totalCost, grandTotal = 0.0;
+
+    FILE *fp = fopen("restock_history.txt", "r");
+    if (fp == NULL) {
+        printf("\nNo restock approval history found yet.\n");
+        return;
+    }
+
+    printf("\n================ RESTOCK APPROVAL HISTORY ================\n");
+    printf("%-10s | %-8s | %-12s | %-15s\n", "Item ID", "Qty", "Total Cost", "Approved By");
+    printf("----------------------------------------------------------\n");
+
+    while (fscanf(fp, "%[^|]|%d|%lf|%[^\n]\n", itemId, &qty, &totalCost, approvedBy) == 4) {
+        printf("%-10s | %-8d | RM %-9.2f | %-15s\n", itemId, qty, totalCost, approvedBy);
+        count++;
+        grandTotal += totalCost;
+    }
+
+    fclose(fp);
+    printf("----------------------------------------------------------\n");
+    printf("Total Approvals: %d | Cumulative Spend: RM %.2f\n", count, grandTotal);
+    printf("==========================================================\n");
+}
+void facility_Equipment_Menu(char currentId[]){
+    int choice;
+    do {
+        printf("\n====================================\n");
+        printf("   SDAMS - Facility Equipment Menu\n");
+        printf("====================================\n");
+        printf("1. Approve Equipment Restock\n");
+        printf("2. View Unresolved Facility Problems\n");
+        printf("3. View Overall Facility & Asset Summary\n");
+        printf("4. View Restock Approval History\n");
+        printf("0. Exit\n");
+        printf("Enter your choice: ");
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n'); 
+            choice = -1;   
+            } else {
+            while (getchar() != '\n');
+        }             
+           switch (choice) {
+            case 1:
+                approve_Restock(currentId);
+                break;
+            case 2:
+                Unresolved_Problems();
+                break;
+            case 3:
+                overall_facility();
+                break;
+            case 4:
+                view_restock_history();
+                break;
+            case 0:
+                printf("Exiting Facility Equipment Menu...\n");
+                break;
+            default:
+                printf("Invalid choice! Please enter a valid option.\n");
+        }
+
+    } while (choice != 0);
+
+    return;
 }
 void manager_log_menu(char currentId[]) {
     int choice;
@@ -353,17 +531,22 @@ void manager_log_menu(char currentId[]) {
         printf("\n====================================\n");
         printf("   SDAMS - Manager Menu (%s)\n", currentId);
         printf("====================================\n");
-        printf("1. Approve Equipment Restock\n");
+        printf("1. Facilities & Equipment Oversight\n");
         printf("2. Change Password\n");
         printf("0. Logout\n");
+        printf("====================================\n");
         printf("Enter your choice: ");
+
         if (scanf("%d", &choice) != 1) {
             while (getchar() != '\n');
             choice = -1;
+        } else {
+            while (getchar() != '\n');
         }
+
         switch (choice) {
             case 1:
-                approve_Restock();
+                facility_Equipment_Menu(currentId);
                 break;
             case 2:
                 change_password(currentId);
@@ -376,9 +559,11 @@ void manager_log_menu(char currentId[]) {
         }
     } while (choice != 0);
 }
+
 int main(void) {
     int choice;
     int loginStatus;
+    char loggedInId[50];
 
     do {
         printf("\n====================================\n");
@@ -387,12 +572,14 @@ int main(void) {
         printf("1. Register Manager\n");
         printf("2. Login as Manager\n");
         printf("3. Exit\n");
+        printf("====================================\n");
         printf("Enter your choice: ");
 
-        // 【优化 2：防止输入字母导致死循环】
         if (scanf("%d", &choice) != 1) {
-            while (getchar() != '\n'); // 把卡在缓冲区里的错误字母吃掉清空
-            choice = 0;                // 设成 0，让下面的 switch 走 default 提示
+            while (getchar() != '\n');
+            choice = 0;
+        } else {
+            while (getchar() != '\n');
         }
 
         switch (choice) {
@@ -400,10 +587,9 @@ int main(void) {
                 manager_register();
                 break;
             case 2:
-                char loggedInId[50];
                 loginStatus = manager_log_system(loggedInId);
                 if (loginStatus == 1) {
-                    printf(">> [Success] Entering Manager Main Menu...\n");
+                    manager_log_menu(loggedInId);
                 }
                 break;
             case 3:
