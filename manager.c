@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
+#include "manager.h"
 struct User {
     char id[50];
     char pass[50];
@@ -48,6 +49,14 @@ struct Admin{
     char role[50];
     char status[20];
     char pass[50];
+};
+struct RefundRequest {
+    char refundID[20];
+    char studentID[20];
+    char studentName[50];
+    double amount;
+    char reason[100];
+    char status[20]; 
 };
 int isStrongPassword(char pass[]) {
     int hasUpper = 0;
@@ -287,11 +296,11 @@ int approve_Restock(char currentId[]){
                   &fileData.quantity, &fileData.unitCost, fileData.status) == 6) {
         if (fileData.quantity < 5 || isSameIgnoreCase(fileData.status, "Low Stock") == 1 || isSameIgnoreCase(fileData.status, "Damaged") == 1) {
             needRestock++;
-            // 1. 写入待补货文件
+          
             fprintf(restockneededFile, "%s|%s|%s|%d|%.2f|%s\n",
                     fileData.id, fileData.name, fileData.category,
                     fileData.quantity, fileData.unitCost, fileData.status);
-            // 2. 同步打印到屏幕给 Manager 看
+          
             printf("%-8s | %-22s | %-16s | %-8d | RM %-9.2f | %-15s\n",
                    fileData.id, fileData.name, fileData.category,
                    fileData.quantity, fileData.unitCost, fileData.status);
@@ -568,7 +577,7 @@ int view_Dojo_Executive_Summary(){
     printf("------------------------------------------------------------\n");
     printf("Total Instructors: %d (Active: %d | Inactive: %d)\n", totalInst, activeInst, totalInst - activeInst);
 
-    printf("\n==================== STUDENT ENROLLMENT ====================\n");
+    printf("\n==================== ACTIVE STUDENTS ====================\n");
     printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Course", "Phone Number");
     printf("------------------------------------------------------------\n");
     while (fscanf(fstu, "%d %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status) == 5) {
@@ -604,9 +613,22 @@ int view_Dojo_Executive_Summary(){
         }
         fclose(fhist);
     }
+    double totalRefund = 0.0;
+    FILE *fr = fopen("refund_requests.txt", "r");
+    if (fr != NULL) {
+        struct RefundRequest refData;
+        while (fscanf(fr, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\n]\n",
+                      refData.refundID, refData.studentID, refData.studentName,
+                      &refData.amount, refData.reason, refData.status) == 6) {
+            if (isSameIgnoreCase(refData.status, "Approved") == 1) {
+                totalRefund += refData.amount;
+            }
+        }
+        fclose(fr);
+    }
 
     double totalSalaryExpense = activeInst * 2800.00;
-    double netProfit = totalAmount - totalSalaryExpense - totalrestockcost;
+    double netProfit = totalAmount - totalSalaryExpense - totalrestockcost- totalRefund;
 
     printf("\n================ DOJO EXECUTIVE & FINANCIAL SUMMARY ================\n");
     printf("Total Enrolled Students   : %d (Active: %d | Inactive: %d)\n", totalStu, activeStu, totalStu - activeStu);
@@ -615,6 +637,7 @@ int view_Dojo_Executive_Summary(){
     printf("(+) Total Tuition Revenue : RM %.2f\n", totalAmount);
     printf("(-) Instructor Salaries   : RM %.2f (%d Active x RM 2800.00)\n", totalSalaryExpense, activeInst);
     printf("(-) Equipment Restock Cost: RM %.2f\n", totalrestockcost);
+    printf("(-) Total Refund          : RM %.2f\n",totalRefund);
     printf("--------------------------------------------------------------------\n");
     printf("(=) Estimated Net Profit  : RM %.2f\n", netProfit);
     printf("====================================================================\n");
@@ -767,6 +790,11 @@ int admin_fired_sys(){
         printf("Error opening file.\n");
         return 0;
     }
+     printf("\n==================== CURRENT ADMIN LIST ====================\n");
+    printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Role", "Status");
+    while (fscanf(fadmin, "%[^|]|%[^|]|%[^|]|%[^|]|%[^\n]\n", fileData.id, fileData.name, fileData.role, fileData.pass, fileData.status) != EOF) {
+    printf("%-10s | %-15s | %-15s | %-15s\n", fileData.id, fileData.name, fileData.role, fileData.status);
+    }
     printf("Enter Admin Id (press 0 to exit): ");
     scanf(" %[^\n]", targetId);
     while (getchar() != '\n');
@@ -776,15 +804,18 @@ int admin_fired_sys(){
         fclose(fadmin);
         return 0;
     }
+    rewind(fadmin);
     FILE *tempFile = fopen("temp.txt", "w");
     if (tempFile == NULL) {
         printf("Error opening temporary file.\n");
         fclose(fadmin);
         return 0;
     }
+
     while (fscanf(fadmin, "%[^|]|%[^|]|%[^|]|%[^|]|%[^\n]\n", fileData.id, fileData.name, fileData.role, fileData.pass, fileData.status) != EOF) {
         if (isSameIgnoreCase(fileData.id, targetId) == 1) {
             found = 1;
+
             } else {
             fprintf(tempFile, "%s|%s|%s|%s|%s\n", fileData.id, fileData.name, fileData.role, fileData.pass, fileData.status);
         }
@@ -804,19 +835,206 @@ int admin_fired_sys(){
     printf("Admin fired successfully!\n");
     return 1;
 }
+int manage_refund_sys() {
+    struct RefundRequest fileData;
+    char targetId[20];
+    int found = 0;
+    int pendingCount = 0;
+    int decision = 0;
 
+    FILE *frefund = fopen("refund_requests.txt", "r");
+    if (frefund == NULL) {
+        printf("No refund requests file found (refund_requests.txt).\n");
+        return 0;
+    }
+
+    printf("\n=================================== PENDING REFUND REQUESTS ===================================\n");
+    printf("%-10s | %-10s | %-18s | %-12s | %-25s | %-10s\n",
+           "Refund ID", "Student ID", "Student Name", "Amount", "Reason", "Status");
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    while (fscanf(frefund, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\n]\n",
+                  fileData.refundID, fileData.studentID, fileData.studentName,
+                  &fileData.amount, fileData.reason, fileData.status) == 6) {
+        if (isSameIgnoreCase(fileData.status, "Pending") == 1) {
+            printf("%-10s | %-10s | %-18s | RM %-9.2f | %-25s | %-10s\n",
+                   fileData.refundID, fileData.studentID, fileData.studentName,
+                   fileData.amount, fileData.reason, fileData.status);
+            pendingCount++;
+        }
+    }
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    if (pendingCount == 0) {
+        printf("No pending refund requests at the moment.\n");
+        fclose(frefund);
+        return 0;
+    }
+
+    printf("Enter Refund ID to process (press 0 to exit): ");
+    scanf(" %19[^\n]", targetId);
+    while (getchar() != '\n');
+
+    if (strcmp(targetId, "0") == 0) {
+        printf("Exiting Refund Approval Menu...\n");
+        fclose(frefund);
+        return 0;
+    }
+
+    printf("Action for [%s] -> [1] Approve Refund  [2] Reject Request  [0] Cancel: ", targetId);
+    if (scanf("%d", &decision) != 1 || (decision != 1 && decision != 2)) {
+        while (getchar() != '\n');
+        printf("Operation cancelled.\n");
+        fclose(frefund);
+        return 0;
+    }
+    while (getchar() != '\n');
+
+    rewind(frefund);
+    FILE *tempFile = fopen("temp.txt", "w");
+    if (tempFile == NULL) {
+        printf("Error opening temporary file.\n");
+        fclose(frefund);
+        return 0;
+    }
+
+    while (fscanf(frefund, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\n]\n",
+                  fileData.refundID, fileData.studentID, fileData.studentName,
+                  &fileData.amount, fileData.reason, fileData.status) == 6) {
+        if (isSameIgnoreCase(fileData.refundID, targetId) == 1 && isSameIgnoreCase(fileData.status, "Pending") == 1) {
+            found = 1;
+            if (decision == 1) {
+                strcpy(fileData.status, "Approved");
+            } else {
+                strcpy(fileData.status, "Rejected");
+            }
+        }
+        fprintf(tempFile, "%s|%s|%s|%.2f|%s|%s\n",
+                fileData.refundID, fileData.studentID, fileData.studentName,
+                fileData.amount, fileData.reason, fileData.status);
+    }
+
+    fclose(frefund);
+    fclose(tempFile);
+
+    if (found == 0) {
+        printf("Pending Refund ID '%s' not found.\n", targetId);
+        remove("temp.txt");
+        return 0;
+    }
+
+    remove("refund_requests.txt");
+    rename("temp.txt", "refund_requests.txt");
+
+    if (decision == 1) {
+        printf("Refund [%s] APPROVED! Net profit will automatically deduct this refund.\n", targetId);
+    } else {
+        printf("Refund [%s] REJECTED.\n", targetId);
+    }
+    return 1;
+}
+int view_Student_Enrollment(){
+    struct student stu;
+    int totalStu = 0, activeStu = 0;
+
+    FILE*fstu=fopen("students.txt","r");
+    if(fstu==NULL){
+        printf("Error opening file.\n");
+        return 0;
+    }
+
+    printf("\n==================== ACTIVE STUDENTS ====================\n");
+    printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Course", "Phone Number");
+    printf("------------------------------------------------------------\n");
+    while (fscanf(fstu, "%d %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status) == 5) {
+        totalStu++;
+        if (isSameIgnoreCase(stu.status, "Active") == 1) {
+            activeStu++;
+            printf("%-10d | %-15s | %-15s | %-15s\n", stu.id, stu.name, stu.course, stu.contact);
+        }
+    }
+    printf("------------------------------------------------------------\n");
+    printf("Total Students: %d (Active: %d | Inactive: %d)\n", totalStu, activeStu, totalStu - activeStu);
+
+    fclose(fstu);
+  
+    return 1;
+}
+int view_refund_his(){
+    struct RefundRequest fileData;
+    FILE*fhistory=fopen("refund_requests.txt", "r");
+    if (fhistory == NULL) {
+    printf("No refund requests file found (refund_requests.txt).\n");
+    return 0;
+    }
+    printf("\n===================================  REFUND REQUESTS HISTORY ===================================\n");
+    printf("%-10s | %-10s | %-18s | %-12s | %-25s | %-10s\n",
+           "Refund ID", "Student ID", "Student Name", "Amount", "Reason", "Status");
+    printf("-----------------------------------------------------------------------------------------------\n");
+
+    while (fscanf(fhistory, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\n]\n",
+                  fileData.refundID, fileData.studentID, fileData.studentName,
+                  &fileData.amount, fileData.reason, fileData.status) == 6) {
+            printf("%-10s | %-10s | %-18s | RM %-9.2f | %-25s | %-10s\n",
+                   fileData.refundID, fileData.studentID, fileData.studentName,
+                   fileData.amount, fileData.reason, fileData.status);
+            }
+    fclose(fhistory);
+    return 1;
+}
+void student_oversight_menu() {
+    int choice;
+
+    do {
+        printf("\n==================================================\n");
+        printf("       MANAGER - STUDENT & REFUND OVERSIGHT       \n");
+        printf("==================================================\n");
+        printf("1. View Student Enrollment & Dropout Audit\n");
+        printf("2. Approve / Reject Pending Refund Requests\n");
+        printf("3. View All Refund History\n");
+        printf("4. View Payment History\n");
+        printf("0. Back to Manager Main Menu\n");
+        printf("--------------------------------------------------\n");
+        printf("Enter your choice: ");
+
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n');
+            printf("Invalid input. Please enter a number.\n");
+            choice = -1;
+            continue;
+        }
+        while (getchar() != '\n');
+
+        switch (choice) {
+            case 1:
+                view_Student_Enrollment();
+                break;
+            case 2:
+                manage_refund_sys(); 
+                break;
+            case 3:
+                view_refund_his();
+                break;
+            case 4:
+                view_payment_History();
+                break;
+            case 0:
+                printf("Returning to Manager Main Menu...\n");
+                break;
+            default:
+                printf("Invalid option! Please select 0 - 4.\n");
+        }
+    } while (choice != 0);
+}
 int manager_Admin_Menu(char currentId[]){
     int choice;
     do {
         printf("\n====================================\n");
-        printf("  SDAMS - Admin & Dojo Oversight\n");
+        printf("  SDAMS - Admin Management\n");
         printf("  Manager: %s\n", currentId);
         printf("====================================\n");
-        printf("1. View Dojo Executive Summary\n");
-        printf("2. View Inactive Personnel\n");
-        printf("3. View Payment History\n");
-        printf("4. Register New Admin\n");
-        printf("5. Fire Admin\n");
+        printf("1. Register New Admin\n");
+        printf("2. Fire Admin\n");
         printf("0. Back to Manager Menu\n");
         printf("====================================\n");
         printf("Enter your choice: ");
@@ -827,21 +1045,14 @@ int manager_Admin_Menu(char currentId[]){
             while (getchar() != '\n');
         }             
            switch (choice) {
+
             case 1:
-                view_Dojo_Executive_Summary();
-                break;
-            case 2:
-                view_Inactive_Personnel();
-                break;
-            case 3:
-                view_payment_History();
-                break;
-            case 4:
                 admin_register();
                 break;
-            case 5:
+            case 2:
                 admin_fired_sys();
                 break;
+
             case 0:
                 printf("Exiting Admin Management Menu...\n");
                 break;
@@ -895,16 +1106,19 @@ void facility_Equipment_Menu(char currentId[]){
 
     return;
 }
-void temp_manager_main_menu(char currentId[]) {
+void manager_main_menu(char currentId[]) {
     int choice;
     do {
         printf("\n============================================\n");
         printf("      SDAMS - MANAGER PORTAL (%s)\n", currentId);
         printf("============================================\n");
         printf("1. Facilities & Equipment Oversight\n");
-        printf("2. Dojo & Admin Oversight (Summary & Audit)\n");
+        printf("2. Admin & Personnel Oversight\n");
+        printf("3. Student & Refund Oversight\n");
+        printf("4. View Dojo Executive Summary\n");
+        printf("5. View Inactive Personnel\n");
+        printf("6. Change Manager Password\n");
         printf("0. Logout\n");
-        printf("============================================\n");
         printf("Enter your choice: ");
 
         if (scanf("%d", &choice) != 1) {
@@ -916,18 +1130,28 @@ void temp_manager_main_menu(char currentId[]) {
 
         switch (choice) {
             case 1:
-                // 调用你原本的设施与器材子菜单
                 facility_Equipment_Menu(currentId);
                 break;
             case 2:
-                // 调用你刚写好的全馆总览与停用人员审查子菜单
                 manager_Admin_Menu(currentId);
+                break;
+            case 3:
+                student_oversight_menu();
+                break;
+            case 4:
+                view_Dojo_Executive_Summary();
+                break;
+            case 5:
+                view_Inactive_Personnel();
+                break;
+            case 6:
+                change_password(currentId);
                 break;
             case 0:
                 printf("\nLogging out Manager [%s]...\n", currentId);
                 break;
             default:
-                printf("\nInvalid choice! Please select 1, 2, or 0.\n");
+                printf("\nInvalid choice! Please select 0 - 6.\n");
         }
     } while (choice != 0);
 }
@@ -937,12 +1161,11 @@ int main(void) {
 
     do {
         printf("\n============================================\n");
-        printf("     SDAMS - MANAGER MODULE (TEST MODE)\n");
+        printf("     SDAMS - MANAGER MODULE\n");
         printf("============================================\n");
         printf("1. Manager Login\n");
         printf("2. Register New Manager\n");
         printf("0. Exit Program\n");
-        printf("============================================\n");
         printf("Enter your choice: ");
 
         if (scanf("%d", &choice) != 1) {
@@ -955,7 +1178,7 @@ int main(void) {
         switch (choice) {
             case 1:
                 if (manager_log_system(currentId) == 1) {
-                    temp_manager_main_menu(currentId);
+                    manager_main_menu(currentId);
                 }
                 break;
             case 2:
