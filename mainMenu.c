@@ -8,6 +8,7 @@
 // Main Menu
 int main() {
     int choice;
+    char currentId[50];
     do {
         printf("\n=========================================\n");
         printf("|  SELF DEFENCE ACADEMY SYSTEM (SDAMS)  |\n");
