@@ -1150,6 +1150,7 @@ void manager_main_menu(char currentId[]) {
                 break;
             case 7:
                 manager_register();
+                break;
             case 0:
                 printf("\nLogging out Manager [%s]...\n", currentId);
                 break;
