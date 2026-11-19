@@ -24,7 +24,9 @@ int main() {
         
         switch (choice) {
             case 1:
-                printf("\n[Manager Menu module not active in this build.]\n");
+                printf(manager_log_system(currentId) == 1) { 
+                    manager_main_menu(currentId);
+                };
                 break;
             case 2:
                 if (adminLogin()) {
