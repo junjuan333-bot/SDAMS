@@ -51,24 +51,45 @@ int paymentRecordsMenu();
 int viewPayments();
 int searchPayment();
 
-// Main Menu
-
-
 // Administrator Login and Logout System
 int adminLogin() {
-    char username[20];
-    char password[20];
+    char username[50];
+    char password[50];
+    char id[50], name[50], role[50], pass[50], status[20];
+    int found = 0;
     
     printf("\n========================================\n");
     printf("|             ADMIN LOGIN              |\n");
     printf("========================================\n");
-    printf("Enter Username (default: admin): ");
-    scanf("%s", username);
-    printf("Enter Password (default: 1234): ");
-    scanf("%s", password);
-    
-    if (strcmp(username, "admin") == 0 && strcmp(password, "1234") == 0) {
-        printf("\nLogin Successful! Welcome Administrator.\n");
+    printf("Enter Username: ");
+    scanf(" %49[^\n]", username);
+    printf("Enter Password: ");
+    scanf(" %49[^\n]", password);
+
+    FILE *file = fopen("admin.txt", "r");
+    if (file == NULL) {
+        printf("\nError: Could not open admin.txt!\n");
+        return 0;
+    }
+
+    while (fscanf(file, "%49[^|]|%49[^|]|%49[^|]|%49[^|]|%19[^\n]\n",
+                  id, name, role, pass, status) == 5) {
+        if (strcmp(username, name) == 0 && strcmp(password, pass) == 0) {
+            if (strcmp(status, "Active") == 0) {
+                found = 1;
+                break;
+            } else {
+                fclose(file);
+                printf("\nAccount is %s! Access Denied.\n", status);
+                return 0;
+            }
+        }
+    }
+
+    fclose(file);
+
+    if (found) {
+        printf("\nLogin Successful! Welcome, %s (%s).\n", name, role);
         return 1;
     } else {
         printf("\nInvalid Credentials! Access Denied.\n");
