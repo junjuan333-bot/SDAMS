@@ -1118,6 +1118,7 @@ void manager_main_menu(char currentId[]) {
         printf("4. View Dojo Executive Summary\n");
         printf("5. View Inactive Personnel\n");
         printf("6. Change Manager Password\n");
+        printf("7. Register new manager Id\n");
         printf("0. Logout\n");
         printf("Enter your choice: ");
 
@@ -1147,11 +1148,13 @@ void manager_main_menu(char currentId[]) {
             case 6:
                 change_password(currentId);
                 break;
+            case 7:
+                manager_register();
             case 0:
                 printf("\nLogging out Manager [%s]...\n", currentId);
                 break;
             default:
-                printf("\nInvalid choice! Please select 0 - 6.\n");
+                printf("\nInvalid choice! Please select 0 - 7.\n");
         }
     } while (choice != 0);
 }
