@@ -24,9 +24,9 @@ int main() {
         
         switch (choice) {
             case 1:
-                printf(manager_log_system(currentId) == 1) { 
+                if (manager_log_system(currentId) == 1) { 
                     manager_main_menu(currentId);
-                };
+                }
                 break;
             case 2:
                 if (adminLogin()) {
