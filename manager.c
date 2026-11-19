@@ -277,14 +277,24 @@ int approve_Restock(char currentId[]){
         fclose(filestock);
         return 0;
     }
-    printf("\n--- Equipment Needing Restock Approval ---\n");
-    while(fscanf(filestock,"%[^|]|%[^|]|%[^|]|%d|%lf|%[^\n]\n",fileData.id,fileData.name,fileData.category,&fileData.quantity,&fileData.unitCost,fileData.status)==6){
-        if(fileData.quantity < 5||isSameIgnoreCase(fileData.status, "Low Stock") == 1||isSameIgnoreCase(fileData.status, "Damaged") == 1){
-            printf("Item ID: %s| Name: %s| Category: %s| Quantity: %d| Unit Cost: %.2lf| Status: %s\n",fileData.id,fileData.name,fileData.category,fileData.quantity,fileData.unitCost,fileData.status);
-            needRestock ++;
-    
-            fprintf(restockneededFile, "%s|%s|%s|%d|%.2lf|%s\n", fileData.id, fileData.name, fileData.category, fileData.quantity, fileData.unitCost, fileData.status);
-  
+    printf("\n=================================== Equipment Needing Restock Approval ===================================\n");
+    printf("%-8s | %-22s | %-16s | %-8s | %-12s | %-15s\n",
+           "Item ID", "Name", "Category", "Quantity", "Unit Cost", "Status");
+    printf("----------------------------------------------------------------------------------------------------------\n");
+
+    while (fscanf(filestock, "%19[^|]|%49[^|]|%29[^|]|%d|%lf|%19[^\n]\n",
+                  fileData.id, fileData.name, fileData.category,
+                  &fileData.quantity, &fileData.unitCost, fileData.status) == 6) {
+        if (fileData.quantity < 5 || isSameIgnoreCase(fileData.status, "Low Stock") == 1 || isSameIgnoreCase(fileData.status, "Damaged") == 1) {
+            needRestock++;
+            // 1. 写入待补货文件
+            fprintf(restockneededFile, "%s|%s|%s|%d|%.2f|%s\n",
+                    fileData.id, fileData.name, fileData.category,
+                    fileData.quantity, fileData.unitCost, fileData.status);
+            // 2. 同步打印到屏幕给 Manager 看
+            printf("%-8s | %-22s | %-16s | %-8d | RM %-9.2f | %-15s\n",
+                   fileData.id, fileData.name, fileData.category,
+                   fileData.quantity, fileData.unitCost, fileData.status);
         }
     }
     fclose(filestock);
@@ -396,21 +406,21 @@ if(fc==NULL){
     printf("Error opening file.\n");
     return 0;
 }
-while (fscanf(fc, "%[^|]|%[^|]|%[^|]|%[^|]|%[^|]|%[^\n]\n",
-              fileData.problemID, fileData.facilityName, fileData.description,
-              fileData.reportedBy, fileData.reportedDate, fileData.status) == 6) {
-    if ((isSameIgnoreCase(fileData.status, "Resolved") == 0)) {
-        printf("\n-----------------------------\n");
-        printf("Problem ID: %s\n", fileData.problemID);
-        printf("Description: %s\n", fileData.description);
-        printf("Status: %s\n", fileData.status);
-        printf("Reported By: %s\n", fileData.reportedBy);
-        printf("Reported Date: %s\n", fileData.reportedDate);
-        printf("Facility Name: %s\n", fileData.facilityName);
-        printf("-----------------------------\n");
-        count++;
+printf("\n====================================== Unresolved Facility Problems ======================================\n");
+    printf("%-10s | %-20s | %-30s | %-15s | %-12s | %-12s\n",
+           "Problem ID", "Facility Name", "Description", "Reported By", "Reported Date", "Status");
+    printf("----------------------------------------------------------------------------------------------------------\n");
+
+    while (fscanf(fc, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%19[^|]|%19[^\n]\n",
+                  fileData.problemID, fileData.facilityName, fileData.description,
+                  fileData.reportedBy, fileData.reportedDate, fileData.status) == 6) {
+        if (isSameIgnoreCase(fileData.status, "Resolved") == 0) {
+            printf("%-10s | %-20s | %-30s | %-15s | %-12s | %-12s\n",
+                   fileData.problemID, fileData.facilityName, fileData.description,
+                   fileData.reportedBy, fileData.reportedDate, fileData.status);
+            count++;
+        }
     }
-}
 fclose(fc);
 if (count == 0) {
     printf("No unresolved facility problems found.\n");
@@ -434,32 +444,40 @@ int overall_facility(){
         if (fp != NULL) fclose(fp);
         return 0;
     }
-    printf("\n==================== INVENTORY OVERVIEW ====================\n");
-    while(fscanf(fi, "%[^|]|%[^|]|%[^|]|%d|%lf|%[^\n]\n",
+printf("\n====================================== INVENTORY OVERVIEW ======================================\n");
+    printf("%-16s | %-6s | %-20s | %-15s | %-8s | %-10s | %-12s\n",
+           "Alert", "ID", "Item Name", "Category", "Qty", "Unit Cost", "Status");
+    printf("------------------------------------------------------------------------------------------------\n");
+
+    while (fscanf(fi, "%19[^|]|%49[^|]|%29[^|]|%d|%lf|%19[^\n]\n",
                   fileData.id, fileData.name, fileData.category,
                   &fileData.quantity, &fileData.unitCost, fileData.status) == 6) {
-                    totalItems++;
+        totalItems++;
         totalUnits += fileData.quantity;
         totalValue += fileData.quantity * fileData.unitCost;
-        if (fileData.quantity < 5 || (isSameIgnoreCase(fileData.status, "Low Stock") == 1 || isSameIgnoreCase(fileData.status, "Damaged") == 1)) {
-            printf("\n[Restock Needed] %s (%s) - Quantity: %d, Status: %s\n",
-                   fileData.name, fileData.id, fileData.quantity, fileData.status);
-            alertCount++;
-            
-        }
-    else {
-        printf("[Normal]         %s | %s | %s | %d | RM %.2f | %s\n",
-                   fileData.id, fileData.name, fileData.category,
+
+        if (fileData.quantity < 5 || isSameIgnoreCase(fileData.status, "Low Stock") == 1 || isSameIgnoreCase(fileData.status, "Damaged") == 1) {
+            printf("%-16s | %-6s | %-20s | %-15s | %-8d | RM %-7.2f | %-12s\n",
+                   "[Restock Needed]", fileData.id, fileData.name, fileData.category,
                    fileData.quantity, fileData.unitCost, fileData.status);
+            alertCount++;
+        } else {
+            printf("%-16s | %-6s | %-20s | %-15s | %-8d | RM %-7.2f | %-12s\n",
+                   "[Normal]", fileData.id, fileData.name, fileData.category,
+                   fileData.quantity, fileData.unitCost, fileData.status);
+        }
     }
-}
-printf("\n================ FACILITY PROBLEMS OVERVIEW ================\n");
+printf("\n=================================== FACILITY PROBLEMS OVERVIEW ===================================\n");
+    printf("%-8s | %-18s | %-28s | %-14s | %-12s | %-12s\n",
+           "Prob ID", "Facility", "Description", "Reported By", "Date", "Status");
+    printf("--------------------------------------------------------------------------------------------------\n");
+
     while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%19[^|]|%19[^\n]\n",
                   fileDatae.problemID, fileDatae.facilityName, fileDatae.description,
                   fileDatae.reportedBy, fileDatae.reportedDate, fileDatae.status) == 6) {
         
         totalProblems++;
-        printf("%s | %s | %s | %s | %s | %s\n",
+        printf("%-8s | %-18s | %-28s | %-14s | %-12s | %-12s\n",
                fileDatae.problemID, fileDatae.facilityName, fileDatae.description,
                fileDatae.reportedBy, fileDatae.reportedDate, fileDatae.status);
 
