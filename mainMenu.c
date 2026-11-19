@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include "admin.h"
 #include "facilities_officer.h"
+#include "manager.h"
 
 // Main Menu
 int main() {
