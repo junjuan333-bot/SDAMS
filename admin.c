@@ -28,7 +28,6 @@ struct Payment {
 } pay;
 
 // Function Prototypes
-int main();
 int adminMenu();
 int adminLogin();
 
@@ -62,31 +61,37 @@ int adminLogin() {
     printf("|             ADMIN LOGIN              |\n");
     printf("========================================\n");
     printf("Enter Username: ");
-    scanf(" %49[^\n]", username);
+    if (scanf(" %49[^\n]", username) != 1) {
+        printf("Error reading username.\n");
+        return 0;
+    }
     printf("Enter Password: ");
-    scanf(" %49[^\n]", password);
+    if (scanf(" %49[^\n]", password) != 1) {
+        printf("Error reading password.\n");
+        return 0;
+    }
 
-    FILE *file = fopen("admin.txt", "r");
-    if (file == NULL) {
+    FILE *fp;
+    fp = fopen("admin.txt", "r");
+    if (fp == NULL) {
         printf("\nError: Could not open admin.txt!\n");
         return 0;
     }
 
-    while (fscanf(file, "%49[^|]|%49[^|]|%49[^|]|%49[^|]|%19[^\n]\n",
-                  id, name, role, pass, status) == 5) {
+    while (fscanf(fp, "%49[^|]|%49[^|]|%49[^|]|%49[^|]|%19[^\n]\n", id, name, role, pass, status) == 5) {
         if (strcmp(username, name) == 0 && strcmp(password, pass) == 0) {
             if (strcmp(status, "Active") == 0) {
                 found = 1;
                 break;
             } else {
-                fclose(file);
+                fclose(fp);
                 printf("\nAccount is %s! Access Denied.\n", status);
                 return 0;
             }
         }
     }
 
-    fclose(file);
+    fclose(fp);
 
     if (found) {
         printf("\nLogin Successful! Welcome, %s (%s).\n", name, role);
@@ -181,14 +186,30 @@ int addInstructor() {
     }
     
     printf("\n--- Add New Instructor ---\n");
-    printf("Enter Instructor ID: ");
-    scanf("%d", &inst.id);
+    printf("Enter Instructor ID (e.g., 101): ");
+    if (scanf("%d", &inst.id) != 1) {
+        printf("\nInvalid ID format.\n");
+        fclose(fp);
+        return 0;
+    }
     printf("Enter Name: ");
-    scanf("%s", inst.name);
+    if (scanf("%s", inst.name) != 1) {
+        printf("\nInvalid name format.\n");
+        fclose(fp);
+        return 0;
+    }
     printf("Enter Martial Arts Role (e.g. Karate): ");
-    scanf("%s", inst.role);
-    printf("Enter Contact Number: ");
-    scanf("%s", inst.contact);
+    if (scanf("%s", inst.role) != 1) {
+        printf("\nInvalid role format.\n");
+        fclose(fp);
+        return 0;
+    }
+    printf("Enter Contact Number (e.g., 0123456789): ");
+    if (scanf("%s", inst.contact) != 1) {
+        printf("\nInvalid contact format.\n");
+        fclose(fp);
+        return 0;
+    }
     strcpy(inst.status, "Active");
     
     fprintf(fp, "%d %s %s %s %s\n", inst.id, inst.name, inst.role, inst.contact, inst.status);
@@ -220,31 +241,76 @@ int viewInstructors() {
 
 int searchInstructor() {
     FILE *fp;
-    int searchId, found = 0;
-    
+    int choice, searchId, found = 0;
+    char searchStr[100];
+
     fp = fopen("instructors.txt", "r");
     if (fp == NULL) {
         printf("\nNo instructor records found.\n");
         return 0;
     }
-    
-    printf("\nEnter Instructor ID to search: ");
-    scanf("%d", &searchId);
-    
-    while (fscanf(fp, "%d %s %s %s %s", &inst.id, inst.name, inst.role, inst.contact, inst.status) != EOF) {
-        if (inst.id == searchId) {
+
+    printf("\nSearch Instructor by:\n");
+    printf("1. ID\n");
+    printf("2. Name\n");
+    printf("3. Role\n");
+    printf("4. Contact\n");
+    printf("Enter choice: ");
+    if (scanf("%d", &choice) != 1) {
+        printf("\nInvalid input.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    if (choice == 1) {
+        printf("Enter Instructor ID: ");
+        if (scanf("%d", &searchId) != 1) {
+            printf("\nInvalid ID format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else if (choice >= 2 && choice <= 4) {
+        printf("Enter search term: ");
+        if (scanf(" %99s", searchStr) != 1) {
+            printf("\nInvalid search term format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else {
+        printf("\nInvalid search option.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    while (fscanf(fp, "%d %s %s %s %s", &inst.id, inst.name, inst.role, inst.contact, inst.status) == 5) {
+        int match = 0;
+
+        if (choice == 1 && inst.id == searchId) {
+            match = 1;
+        } else if (choice == 2 && strcmp(inst.name, searchStr) == 0) {
+            match = 1;
+        } else if (choice == 3 && strcmp(inst.role, searchStr) == 0) {
+            match = 1;
+        } else if (choice == 4 && strcmp(inst.contact, searchStr) == 0) {
+            match = 1;
+        }
+
+        if (match) {
             printf("\n--- Instructor Record Found ---\n");
-            printf("ID      : %d\nName    : %s\nRole    : %s\nContact : %s\nStatus  : %s\n", 
+            printf("ID      : %d\nName    : %s\nRole    : %s\nContact : %s\nStatus  : %s\n",
                    inst.id, inst.name, inst.role, inst.contact, inst.status);
             found = 1;
-            break;
+            
+            if (choice == 1) {
+                break;
+            }
         }
     }
-    
-    if (found == 0) {
-        printf("\nInstructor with ID %d not found.\n", searchId);
+
+    if (!found) {
+        printf("\nNo matching instructor record found.\n");
     }
-    
+
     fclose(fp);
     return 1;
 }
@@ -267,14 +333,24 @@ int updateInstructor() {
     }
     
     printf("\nEnter Instructor ID to update status: ");
-    scanf("%d", &searchId);
-    
+    if (scanf("%d", &searchId) != 1) {
+        printf("\nInvalid ID format.\n");
+        fclose(fp);
+        fclose(tempFp);
+        return 0;
+    }
+
     while (fscanf(fp, "%d %s %s %s %s", &inst.id, inst.name, inst.role, inst.contact, inst.status) != EOF) {
         if (inst.id == searchId) {
             found = 1;
             printf("Current Status for %s: %s\n", inst.name, inst.status);
             printf("Enter new status (Active / Not_Active): ");
-            scanf("%s", inst.status);
+            if (scanf("%s", inst.status) != 1) {
+                printf("\nInvalid status format.\n");
+                fclose(fp);
+                fclose(tempFp);
+                return 0;
+            }
         }
         fprintf(tempFp, "%d %s %s %s %s\n", inst.id, inst.name, inst.role, inst.contact, inst.status);
     }
@@ -343,13 +419,29 @@ int addStudent() {
     
     printf("\n--- Add New Student ---\n");
     printf("Enter Student ID: ");
-    scanf("%d", &std.id);
+    if (scanf("%d", &std.id) != 1) {
+        printf("\nInvalid ID format.\n");
+        fclose(fp);
+        return 0;
+    }
     printf("Enter Name: ");
-    scanf("%s", std.name);
+    if (scanf("%s", std.name) != 1) {
+        printf("\nInvalid name format.\n");
+        fclose(fp);
+        return 0;
+    }
     printf("Enter Course/Info: ");
-    scanf("%s", std.info);
+    if (scanf("%s", std.info) != 1) {
+        printf("\nInvalid info format.\n");
+        fclose(fp);
+        return 0;
+    }
     printf("Enter Contact Number: ");
-    scanf("%s", std.contact);
+    if (scanf("%s", std.contact) != 1) {
+        printf("\nInvalid contact format.\n");
+        fclose(fp);
+        return 0;
+    }
     strcpy(std.status, "Active");
     
     fprintf(fp, "%d %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status);
@@ -381,31 +473,76 @@ int viewStudents() {
 
 int searchStudent() {
     FILE *fp;
-    int searchId, found = 0;
-    
+    int choice, searchId, found = 0;
+    char searchStr[100];
+
     fp = fopen("students.txt", "r");
     if (fp == NULL) {
         printf("\nNo student records found.\n");
         return 0;
     }
-    
-    printf("\nEnter Student ID to search: ");
-    scanf("%d", &searchId);
-    
-    while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) != EOF) {
-        if (std.id == searchId) {
+
+    printf("\nSearch Student by:\n");
+    printf("1. ID\n");
+    printf("2. Name\n");
+    printf("3. Info\n");
+    printf("4. Contact\n");
+    printf("Enter choice: ");
+    if (scanf("%d", &choice) != 1) {
+        printf("\nInvalid input.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    if (choice == 1) {
+        printf("Enter Student ID: ");
+        if (scanf("%d", &searchId) != 1) {
+            printf("\nInvalid ID format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else if (choice >= 2 && choice <= 4) {
+        printf("Enter search term: ");
+        if (scanf(" %99s", searchStr) != 1) {
+            printf("\nInvalid search term format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else {
+        printf("\nInvalid search option.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) == 5) {
+        int match = 0;
+
+        if (choice == 1 && std.id == searchId) {
+            match = 1;
+        } else if (choice == 2 && strcmp(std.name, searchStr) == 0) {
+            match = 1;
+        } else if (choice == 3 && strcmp(std.info, searchStr) == 0) {
+            match = 1;
+        } else if (choice == 4 && strcmp(std.contact, searchStr) == 0) {
+            match = 1;
+        }
+
+        if (match) {
             printf("\n--- Student Record Found ---\n");
-            printf("ID     : %d\nName   : %s\nInfo   : %s\nContact: %s\nStatus : %s\n", 
+            printf("ID     : %d\nName   : %s\nInfo   : %s\nContact: %s\nStatus : %s\n",
                    std.id, std.name, std.info, std.contact, std.status);
             found = 1;
-            break;
+
+            if (choice == 1) {
+                break;
+            }
         }
     }
-    
-    if (found == 0) {
-        printf("\nStudent with ID %d not found.\n", searchId);
+
+    if (!found) {
+        printf("\nNo matching student record found.\n");
     }
-    
+
     fclose(fp);
     return 1;
 }
@@ -428,14 +565,24 @@ int updateStudent() {
     }
     
     printf("\nEnter Student ID to update status: ");
-    scanf("%d", &searchId);
-    
+    if (scanf("%d", &searchId) != 1) {
+        printf("\nInvalid ID format.\n");
+        fclose(fp);
+        fclose(tempFp);
+        return 0;
+    }
+
     while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) != EOF) {
         if (std.id == searchId) {
             found = 1;
             printf("Current Status for %s: %s\n", std.name, std.status);
             printf("Enter new status (Active / Not_Active): ");
-            scanf("%s", std.status);
+            if (scanf("%s", std.status) != 1) {
+                printf("\nInvalid status format.\n");
+                fclose(fp);
+                fclose(tempFp);
+                return 0;
+            }
         }
         fprintf(tempFp, "%d %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status);
     }
@@ -508,33 +655,95 @@ int viewPayments() {
 
 int searchPayment() {
     FILE *fp;
-    int searchId, found = 0;
-    
+    int choice, searchId, found = 0;
+    float searchAmount;
+    char searchDate[50];
+
     fp = fopen("payments.txt", "r");
     if (fp == NULL) {
         printf("\nNo payment records found.\n");
         return 0;
     }
-    
-    printf("\nEnter Student ID to filter payment records: ");
-    scanf("%d", &searchId);
-    
-    printf("\n--- Payment Records for Student ID %d ---\n", searchId);
-    printf("----------------------------------------\n");
-    printf("%-12s %-10s %-15s\n", "Payment ID", "Amount", "Date");
-    printf("----------------------------------------\n");
-    
-    while (fscanf(fp, "%d %d %f %s", &pay.paymentId, &pay.studentId, &pay.amount, pay.date) != EOF) {
-        if (pay.studentId == searchId) {
-            printf("%-12d $%-9.2f %-15s\n", pay.paymentId, pay.amount, pay.date);
+
+    printf("\nSearch Payment by:\n");
+    printf("1. Payment ID\n");
+    printf("2. Student ID\n");
+    printf("3. Amount\n");
+    printf("4. Date\n");
+    printf("Enter choice: ");
+    if (scanf("%d", &choice) != 1) {
+        printf("\nInvalid input.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    if (choice == 1) {
+        printf("Enter Payment ID: ");
+        if (scanf("%d", &searchId) != 1) {
+            printf("\nInvalid ID format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else if (choice == 2) {
+        printf("Enter Student ID: ");
+        if (scanf("%d", &searchId) != 1) {
+            printf("\nInvalid ID format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else if (choice == 3) {
+        printf("Enter Payment Amount: ");
+        if (scanf("%f", &searchAmount) != 1) {
+            printf("\nInvalid amount format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else if (choice == 4) {
+        printf("Enter Payment Date: ");
+        if (scanf(" %49s", searchDate) != 1) {
+            printf("\nInvalid date format.\n");
+            fclose(fp);
+            return 0;
+        }
+    } else {
+        printf("\nInvalid search option.\n");
+        fclose(fp);
+        return 0;
+    }
+
+    printf("\n--- Matching Payment Records ---\n");
+    printf("-----------------------------------------------------\n");
+    printf("%-12s %-12s %-10s %-15s\n", "Payment ID", "Student ID", "Amount", "Date");
+    printf("-----------------------------------------------------\n");
+
+    while (fscanf(fp, "%d %d %f %s", &pay.paymentId, &pay.studentId, &pay.amount, pay.date) == 4) {
+        int match = 0;
+
+        if (choice == 1 && pay.paymentId == searchId) {
+            match = 1;
+        } else if (choice == 2 && pay.studentId == searchId) {
+            match = 1;
+        } else if (choice == 3 && (pay.amount - searchAmount < 0.01f && searchAmount - pay.amount < 0.01f)) {
+            match = 1;
+        } else if (choice == 4 && strcmp(pay.date, searchDate) == 0) {
+            match = 1;
+        }
+
+        if (match) {
+            printf("%-12d %-12d $%-9.2f %-15s\n", pay.paymentId, pay.studentId, pay.amount, pay.date);
             found = 1;
+
+            if (choice == 1) {
+                break;
+            }
         }
     }
-    
-    if (found == 0) {
-        printf("\nNo payment records found for Student ID %d.\n", searchId);
+
+    if (!found) {
+        printf("No matching payment records found.\n");
     }
-    
+    printf("-----------------------------------------------------\n");
+
     fclose(fp);
     return 1;
 }
