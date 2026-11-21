@@ -982,6 +982,232 @@ int view_refund_his(){
     fclose(fhistory);
     return 1;
 }
+int search_admin(void) {
+    struct Admin fileData;
+    char keyword[50];
+    int found = 0;
+
+    FILE *fp = fopen("admin.txt", "r");
+    if (fp == NULL) {
+        printf("\nError opening admin.txt.\n");
+        return 0;
+    }
+
+    printf("\nEnter Admin ID or Name to search (0 to cancel): ");
+    scanf(" %49[^\n]", keyword);
+    while (getchar() != '\n');
+
+    if (strcmp(keyword, "0") == 0) {
+        fclose(fp);
+        return 0;
+    }
+
+    printf("\n==================== SEARCH ADMIN RESULT ====================\n");
+    printf("%-10s | %-20s | %-12s | %-10s\n", "ID", "Name", "Role", "Status");
+    printf("-------------------------------------------------------------\n");
+
+    while (fscanf(fp, "%49[^|]|%49[^|]|%49[^|]|%49[^|]|%19[^\n]\n",
+                  fileData.id, fileData.name, fileData.role, fileData.pass, fileData.status) == 5) {
+        if (isSameIgnoreCase(fileData.id, keyword) == 1 || strstr(fileData.name, keyword) != NULL) {
+            printf("%-10s | %-20s | %-12s | %-10s\n",
+                   fileData.id, fileData.name, fileData.role, fileData.status);
+            found++;
+        }
+    }
+
+    if (found == 0) {
+        printf("No matching administrator found for '%s'.\n", keyword);
+    }
+    printf("-------------------------------------------------------------\n");
+
+    fclose(fp);
+    return found > 0 ? 1 : 0;
+}
+
+int staff_report(void) {
+    struct Admin adm;
+    struct instructor inst;
+    int choice, totalAdmin = 0, totalInst = 0, matchCount = 0;
+    char keyword[50];
+
+    printf("\n==================== STAFF REPORT FILTER ====================\n");
+    printf("1. View All Staff (Administrators & Instructors)\n");
+    printf("2. Filter by Role (e.g., Admin, Karate, Taekwondo)\n");
+    printf("3. Filter by Name\n");
+    printf("0. Back\n");
+    printf("Enter choice: ");
+    if (scanf("%d", &choice) != 1) {
+        while (getchar() != '\n');
+        printf("Invalid input.\n");
+        return 0;
+    }
+    while (getchar() != '\n');
+
+    switch (choice) {
+        case 0:
+            return 0;
+        case 1:
+            break;
+        case 2:
+        case 3:
+            printf("Enter search keyword: ");
+            scanf(" %49[^\n]", keyword);
+            while (getchar() != '\n');
+            break;
+        default:
+            printf("Invalid option.\n");
+            return 0;
+    }
+
+    printf("\n========================= STAFF REPORT =========================\n");
+    printf("%-10s | %-20s | %-15s | %-10s\n", "ID", "Name", "Role", "Status");
+    printf("----------------------------------------------------------------\n");
+
+    FILE *fadm = fopen("admin.txt", "r");
+    if (fadm != NULL) {
+        while (fscanf(fadm, "%49[^|]|%49[^|]|%49[^|]|%49[^|]|%19[^\n]\n",
+                      adm.id, adm.name, adm.role, adm.pass, adm.status) == 5) {
+            int show = 0;
+            switch (choice) {
+                case 1:
+                    show = 1;
+                    break;
+                case 2:
+                    if (isSameIgnoreCase(adm.role, keyword) == 1) show = 1;
+                    break;
+                case 3:
+                    if (strstr(adm.name, keyword) != NULL) show = 1;
+                    break;
+            }
+
+            if (show) {
+                printf("%-10s | %-20s | %-15s | %-10s\n", adm.id, adm.name, adm.role, adm.status);
+                totalAdmin++;
+                matchCount++;
+            }
+        }
+        fclose(fadm);
+    }
+
+    FILE *finst = fopen("instructors.txt", "r");
+    if (finst != NULL) {
+        while (fscanf(finst, "%d %49s %49s %19s %19s",
+                      &inst.id, inst.name, inst.course, inst.contact, inst.status) == 5) {
+            int show = 0;
+            switch (choice) {
+                case 1:
+                    show = 1;
+                    break;
+                case 2:
+                    if (isSameIgnoreCase(inst.course, keyword) == 1) show = 1;
+                    break;
+                case 3:
+                    if (strstr(inst.name, keyword) != NULL) show = 1;
+                    break;
+            }
+
+            if (show) {
+                printf("%-10d | %-20s | %-15s | %-10s\n", inst.id, inst.name, inst.course, inst.status);
+                totalInst++;
+                matchCount++;
+            }
+        }
+        fclose(finst);
+    }
+
+    printf("----------------------------------------------------------------\n");
+    if (matchCount == 0) {
+        printf("No matching staff records found.\n");
+    } else {
+        printf("Summary -> Administrators: %d | Instructors: %d | Total Listed: %d\n",
+               totalAdmin, totalInst, matchCount);
+    }
+    printf("================================================================\n");
+    return 1;
+}
+
+int revenue_report(void) {
+    struct payment pay;
+    int choice, regCount = 0;
+    double totalRev = 0.0;
+    char filterDate[20];
+
+    FILE *fpay = fopen("payments.txt", "r");
+    if (fpay == NULL) {
+        printf("\nError opening payments.txt.\n");
+        return 0;
+    }
+
+    printf("\n=================== REVENUE REPORT FILTER ===================\n");
+    printf("1. View All Revenue\n");
+    printf("2. Filter by Month (e.g., 2026-11)\n");
+    printf("3. Filter by Year  (e.g., 2026)\n");
+    printf("0. Back\n");
+    printf("Enter choice: ");
+    if (scanf("%d", &choice) != 1) {
+        while (getchar() != '\n');
+        fclose(fpay);
+        printf("Invalid input.\n");
+        return 0;
+    }
+    while (getchar() != '\n');
+
+    switch (choice) {
+        case 0:
+            fclose(fpay);
+            return 0;
+        case 1:
+            break;
+        case 2:
+            printf("Enter Year-Month (YYYY-MM): ");
+            scanf(" %19s", filterDate);
+            while (getchar() != '\n');
+            break;
+        case 3:
+            printf("Enter Year (YYYY): ");
+            scanf(" %19s", filterDate);
+            while (getchar() != '\n');
+            break;
+        default:
+            fclose(fpay);
+            printf("Invalid option.\n");
+            return 0;
+    }
+
+    printf("\n======================= REVENUE REPORT =======================\n");
+    printf("%-12s | %-15s | %-14s | %-15s\n", "Payment ID", "Student ID", "Amount", "Payment Date");
+    printf("--------------------------------------------------------------\n");
+
+    while (fscanf(fpay, "%d %49s %lf %19s", &pay.Id, pay.studentid, &pay.amount, pay.paymentDate) == 4) {
+        int show = 0;
+        switch (choice) {
+            case 1:
+                show = 1;
+                break;
+            case 2:
+            case 3:
+                if (strncmp(pay.paymentDate, filterDate, strlen(filterDate)) == 0) {
+                    show = 1;
+                }
+                break;
+        }
+
+        if (show) {
+            printf("%-12d | %-15s | RM %-11.2f | %-15s\n",
+                   pay.Id, pay.studentid, pay.amount, pay.paymentDate);
+            regCount++;
+            totalRev += pay.amount;
+        }
+    }
+
+    printf("--------------------------------------------------------------\n");
+    printf("Total Class Registrations / Transactions: %d\n", regCount);
+    printf("Total Revenue                           : RM %.2f\n", totalRev);
+    printf("==============================================================\n");
+
+    fclose(fpay);
+    return 1;
+}
 void student_oversight_menu() {
     int choice;
 
@@ -1035,6 +1261,7 @@ int manager_Admin_Menu(char currentId[]){
         printf("====================================\n");
         printf("1. Register New Admin\n");
         printf("2. Fire Admin\n");
+        printf("3. Search Administrator\n");
         printf("0. Back to Manager Menu\n");
         printf("====================================\n");
         printf("Enter your choice: ");
@@ -1052,7 +1279,9 @@ int manager_Admin_Menu(char currentId[]){
             case 2:
                 admin_fired_sys();
                 break;
-
+            case 3:
+                search_admin();
+                break;
             case 0:
                 printf("Exiting Admin Management Menu...\n");
                 break;
@@ -1106,6 +1335,49 @@ void facility_Equipment_Menu(char currentId[]){
 
     return;
 }
+void Reports_Financial_Summary(void) {
+    int choice;
+    do {
+        printf("\n====================================\n");
+        printf("   SDAMS - Reports & Financial Summary\n");
+        printf("====================================\n");
+        printf("1. View Dojo Executive Summary\n");
+        printf("2. View Inactive Personnel\n");
+        printf("3. Staff Report\n");
+        printf("4. Revenue Report\n");
+        printf("0. Back to Manager Menu\n");
+        printf("Enter your choice: ");
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n'); 
+            choice = -1;   
+        } else {
+            while (getchar() != '\n');
+        }             
+
+        switch (choice) {
+            case 1:
+                view_Dojo_Executive_Summary();
+                break;
+            case 2:
+                view_Inactive_Personnel();
+                break;
+            case 3:
+                staff_report();
+                break;
+            case 4:
+                revenue_report();
+                break;
+            case 0:
+                printf("Returning to Manager Menu...\n");
+                break;
+            default:
+                printf("Invalid choice! Please enter a valid option.\n");
+        }
+
+    } while (choice != 0);
+
+    return;
+}
 void manager_main_menu(char currentId[]) {
     int choice;
     do {
@@ -1115,8 +1387,7 @@ void manager_main_menu(char currentId[]) {
         printf("1. Facilities & Equipment Oversight\n");
         printf("2. Admin & Personnel Oversight\n");
         printf("3. Student & Refund Oversight\n");
-        printf("4. View Dojo Executive Summary\n");
-        printf("5. View Inactive Personnel\n");
+        printf("4. Report & Financial Summary\n");
         printf("6. Change Manager Password\n");
         printf("7. Register new manager Id\n");
         printf("0. Logout\n");
@@ -1140,15 +1411,12 @@ void manager_main_menu(char currentId[]) {
                 student_oversight_menu();
                 break;
             case 4:
-                view_Dojo_Executive_Summary();
+                Reports_Financial_Summary();
                 break;
             case 5:
-                view_Inactive_Personnel();
-                break;
-            case 6:
                 change_password(currentId);
                 break;
-            case 7:
+            case 6:
                 manager_register();
                 break;
             case 0:
