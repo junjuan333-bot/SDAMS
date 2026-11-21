@@ -1,7 +1,18 @@
+/*
+ * File: manager.c
+ * Module: Manager Module - Self Defence Academy Management System (SDAMS)
+ * Description: Implements manager authentication, administrator management, staff/revenue
+ *              reporting, restock/refund approvals, and executive financial summaries.
+ */
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include "manager.h"
+// Symbolic Constants for SDAMS Manager Module
+#define INSTRUCTOR_MONTHLY_SALARY 2800.00
+#define MIN_PASSWORD_LENGTH       8
+#define MAX_STR_LEN               50
+#define MAX_REASON_LEN            100
 struct User {
     char id[50];
     char pass[50];
@@ -43,12 +54,12 @@ struct payment{
      double amount;
     char paymentDate[20];
     };
-struct Admin{
+struct Admin {
     char id[50];
     char name[50];
     char role[50];
-    char status[20];
-    char pass[50];
+    char status[20]; 
+    char pass[50];  
 };
 struct RefundRequest {
     char refundID[20];
@@ -58,6 +69,11 @@ struct RefundRequest {
     char reason[100];
     char status[20]; 
 };
+/*
+ * Function: isStrongPassword
+ * Purpose : Validates that a password meets minimum length (MIN_PASSWORD_LENGTH) and character complexity rules.
+ * Assumption: Passwords must not contain pipe ('|') characters to prevent file delimiter corruption.
+ */
 int isStrongPassword(char pass[]) {
     int hasUpper = 0;
     int hasLower = 0;
@@ -65,10 +81,10 @@ int isStrongPassword(char pass[]) {
     int hasSpecial = 0;
     int len = strlen(pass);
 
-    if (len < 8) {
+    if (len < MIN_PASSWORD_LENGTH) {
+
         return 0;
     }
-
     for (int i = 0; i < len; i++) {
         if (pass[i] == '|') {
             return 0;
@@ -86,6 +102,11 @@ int isStrongPassword(char pass[]) {
 
     return (hasUpper && hasLower && hasDigit && hasSpecial);
 }
+/*
+ * Function: manager_log_system
+ * Purpose : Authenticates Manager credentials against manager.txt and routes to Manager Menu.
+ * Assumption: manager.txt exists in the root directory with valid pipe-delimited records.
+ */
 int manager_log_system(char loggedInId[]) {
     struct User input;
     struct User fileData;
@@ -121,7 +142,11 @@ int manager_log_system(char loggedInId[]) {
 
     return found;
 }
-
+/*
+ * Function: manager_register
+ * Purpose : Registers a new Manager account after checking for duplicate IDs and validating password strength.
+ * Assumption: manager.txt stores valid pipe-delimited records (ID|Password|Role) and IDs are unique.
+ */
 int manager_register() {
     struct User newUser;
     struct User checkUser;
@@ -168,7 +193,11 @@ int manager_register() {
     return 1;
 
 }
-
+/*
+ * Function: change_password
+ * Purpose : Verifies the logged-in Manager's current password and updates it to a new strong password in manager.txt.
+ * Assumption: Updating manager credentials safely uses a temporary file (temp.txt) before replacing manager.txt.
+ */
 int change_password(char currentId[]) {
     struct User fileData;
     char oldPass[50];
@@ -241,6 +270,11 @@ int change_password(char currentId[]) {
     printf("Password changed successfully.\n");
     return 1;
 }
+/*
+ * Function: isSameIgnoreCase
+ * Purpose : Performs a case-insensitive comparison between two strings.
+ * Assumption: Both input strings are valid null-terminated character arrays.
+ */
 int isSameIgnoreCase(char s1[], char s2[]) {
     int i = 0;
     while (s1[i] != '\0' && s2[i] != '\0') {
@@ -251,6 +285,11 @@ int isSameIgnoreCase(char s1[], char s2[]) {
     }
     return (s1[i] == '\0' && s2[i] == '\0');
 }
+/*
+ * Function: getRestockUnitCost
+ * Purpose : Looks up and returns the unit cost of a target equipment ID from restock_needed.txt.
+ * Assumption: restock_needed.txt is freshly generated from inventory.txt prior to calling this helper function.
+ */
 double getRestockUnitCost(char targetId[]) {
     struct Inventory temp;
     FILE *fp = fopen("restock_needed.txt", "r");
@@ -268,6 +307,11 @@ double getRestockUnitCost(char targetId[]) {
     fclose(fp);
     return -1.0; 
 }
+/*
+ * Function: approve_Restock
+ * Purpose : Reviews pending equipment restock requests, updates inventory stock levels, and logs approvals to restock_history.txt.
+ * Assumption: Pending requests are stored in restock_requests.txt and valid equipment IDs exist in inventory.txt.
+ */
 int approve_Restock(char currentId[]){
     struct Inventory fileData;
     int needRestock = 0;
@@ -406,7 +450,11 @@ int approve_Restock(char currentId[]){
     }
     return 1;
 }
-
+/*
+ * Function: Unresolved_Problems
+ * Purpose : Reads facility_problems.txt and displays all facility issues whose status is not "Resolved".
+ * Assumption: facility_problems.txt follows the 6-field pipe-delimited format and uses "Resolved" for closed cases.
+ */
 int Unresolved_Problems() {
     struct FacilityProblem fileData;
     int count=0;
@@ -438,6 +486,11 @@ if (count == 0) {
 }
 return 1;
 }
+/*
+ * Function: overall_facility
+ * Purpose : Generates a combined audit report of equipment inventory valuation, low-stock alerts, and facility problem counts.
+ * Assumption: Equipment items with quantity < 5 or status "Low Stock"/"Damaged" require restock attention.
+ */
 int overall_facility(){
     struct Inventory fileData;
     struct FacilityProblem fileDatae;
@@ -511,6 +564,11 @@ printf("\n=================================== FACILITY PROBLEMS OVERVIEW =======
     printf("============================================================\n");
     return 1;
 }
+/*
+ * Function: view_restock_history
+ * Purpose : Reads restock_history.txt to display approved equipment restocks and cumulative spend.
+ * Assumption: Each history entry contains ItemID, Quantity, TotalCost, and Approver separated by pipes.
+ */
 void view_restock_history(void) {
     char itemId[10], approvedBy[50];
     int qty, count = 0;
@@ -537,6 +595,11 @@ void view_restock_history(void) {
     printf("Total Approvals: %d | Cumulative Spend: RM %.2f\n", count, grandTotal);
     printf("==========================================================\n");
 }
+/*
+ * Function: view_Dojo_Executive_Summary
+ * Purpose : Aggregates active personnel, revenue, salaries, restock costs, and refunds to compute net profit.
+ * Assumption: Each active instructor receives a fixed monthly salary defined by INSTRUCTOR_MONTHLY_SALARY.
+ */
 int view_Dojo_Executive_Summary(){
     struct instructor inst;
     struct student stu;
@@ -626,8 +689,7 @@ int view_Dojo_Executive_Summary(){
         }
         fclose(fr);
     }
-
-    double totalSalaryExpense = activeInst * 2800.00;
+double totalSalaryExpense = activeInst * INSTRUCTOR_MONTHLY_SALARY;
     double netProfit = totalAmount - totalSalaryExpense - totalrestockcost- totalRefund;
 
     printf("\n================ DOJO EXECUTIVE & FINANCIAL SUMMARY ================\n");
@@ -635,7 +697,7 @@ int view_Dojo_Executive_Summary(){
     printf("Total Fee Transactions    : %d\n", totalPay);
     printf("--------------------------------------------------------------------\n");
     printf("(+) Total Tuition Revenue : RM %.2f\n", totalAmount);
-    printf("(-) Instructor Salaries   : RM %.2f (%d Active x RM 2800.00)\n", totalSalaryExpense, activeInst);
+    printf("(-) Instructor Salaries   : RM %.2f (%d Active x RM %.2f)\n", totalSalaryExpense, activeInst, INSTRUCTOR_MONTHLY_SALARY);
     printf("(-) Equipment Restock Cost: RM %.2f\n", totalrestockcost);
     printf("(-) Total Refund          : RM %.2f\n",totalRefund);
     printf("--------------------------------------------------------------------\n");
@@ -644,6 +706,11 @@ int view_Dojo_Executive_Summary(){
 
     return 1;
 }
+/*
+ * Function: view_Inactive_Personnel
+ * Purpose : Scans instructors.txt and students.txt to list all personnel marked as "Not_Active".
+ * Assumption: Inactive accounts use the standardized status string "Not_Active".
+ */
 int view_Inactive_Personnel(){
     struct instructor inst;
     struct student stu;
@@ -698,6 +765,11 @@ int view_Inactive_Personnel(){
     return 1;
 
 }
+/*
+ * Function: view_payment_History
+ * Purpose : Reads payments.txt to display all student fee transactions and calculates cumulative tuition revenue.
+ * Assumption: Each line in payments.txt contains PaymentID, StudentID, Amount, and PaymentDate separated by spaces.
+ */
 int view_payment_History(){
     struct payment pay;
     int totalPay = 0;
@@ -727,6 +799,11 @@ if (totalPay == 0) {
     fclose(fpay);
     return 1;
 }
+/*
+ * Function: admin_register
+ * Purpose : Creates a new administrator account, validates password strength, and appends it to admin.txt.
+ * Assumption: New administrator IDs are unique and input fields do not contain pipe ('|') delimiters.
+ */
 int admin_register() {
     struct Admin newUser;
     struct Admin checkUser;
@@ -781,6 +858,11 @@ int admin_register() {
     return 1;
 
 }
+/*
+ * Function: admin_fired_sys
+ * Purpose : Displays existing administrator accounts and updates/removes a selected admin record via a temporary file.
+ * Assumption: Updating records safely uses a temporary file (temp.txt) before replacing admin.txt.
+ */
 int admin_fired_sys(){
     struct Admin fileData;
     char targetId[50];
@@ -835,6 +917,11 @@ int admin_fired_sys(){
     printf("Admin fired successfully!\n");
     return 1;
 }
+/*
+ * Function: manage_refund_sys
+ * Purpose : Displays pending student refund requests and allows the Manager to approve or reject them.
+ * Assumption: Refund records in refund_requests.txt follow the 6-field pipe-delimited schema.
+ */
 int manage_refund_sys() {
     struct RefundRequest fileData;
     char targetId[20];
@@ -933,6 +1020,11 @@ int manage_refund_sys() {
     }
     return 1;
 }
+/*
+ * Function: view_Student_Enrollment
+ * Purpose : Scans students.txt to list all active students and summarizes active versus inactive enrollment counts.
+ * Assumption: Active student records are marked with the status string "Active" (case-insensitive).
+ */
 int view_Student_Enrollment(){
     struct student stu;
     int totalStu = 0, activeStu = 0;
@@ -960,6 +1052,11 @@ int view_Student_Enrollment(){
   
     return 1;
 }
+/*
+ * Function: view_refund_his
+ * Purpose : Reads refund_requests.txt in read-only mode to display all historical refund requests and statuses.
+ * Assumption: refund_requests.txt is accessible in the working directory when records exist.
+ */
 int view_refund_his(){
     struct RefundRequest fileData;
     FILE*fhistory=fopen("refund_requests.txt", "r");
@@ -982,6 +1079,11 @@ int view_refund_his(){
     fclose(fhistory);
     return 1;
 }
+/*
+ * Function: search_admin
+ * Purpose : Searches existing administrator records in admin.txt by exact ID or partial name.
+ * Assumption: Admin records follow the format ID|Name|Role|Password|Status.
+ */
 int search_admin(void) {
     struct Admin fileData;
     char keyword[50];
@@ -1023,7 +1125,11 @@ int search_admin(void) {
     fclose(fp);
     return found > 0 ? 1 : 0;
 }
-
+/*
+ * Function: staff_report
+ * Purpose : Displays and filters combined staff records (Administrators and Instructors) by role or name.
+ * Assumption: admin.txt uses pipe delimiters while instructors.txt uses space-separated fields.
+ */
 int staff_report(void) {
     struct Admin adm;
     struct instructor inst;
@@ -1125,7 +1231,11 @@ int staff_report(void) {
     printf("================================================================\n");
     return 1;
 }
-
+/*
+ * Function: revenue_report
+ * Purpose : Generates total or filtered (monthly/yearly) tuition revenue and registration counts.
+ * Assumption: Payment dates in payments.txt are stored in YYYY-MM-DD format.
+ */
 int revenue_report(void) {
     struct payment pay;
     int choice, regCount = 0;
@@ -1208,6 +1318,11 @@ int revenue_report(void) {
     fclose(fpay);
     return 1;
 }
+/*
+ * Function: student_oversight_menu
+ * Purpose : Displays the Student & Refund Oversight submenu and dispatches user choices to enrollment, refund, or payment functions.
+ * Assumption: User enters integer menu choices; non-numeric inputs are cleared from stdin to prevent infinite loops.
+ */
 void student_oversight_menu() {
     int choice;
 
@@ -1252,6 +1367,11 @@ void student_oversight_menu() {
         }
     } while (choice != 0);
 }
+/*
+ * Function: manager_Admin_Menu
+ * Purpose : Displays the Admin Management submenu allowing the Manager to register, remove, or search administrators.
+ * Assumption: Valid manager session ID is passed in and submenu loops until user enters 0.
+ */
 int manager_Admin_Menu(char currentId[]){
     int choice;
     do {
@@ -1292,7 +1412,11 @@ int manager_Admin_Menu(char currentId[]){
     
         return 1;
     }
-   
+/*
+ * Function: facility_Equipment_Menu
+ * Purpose : Displays the Facility & Equipment Oversight submenu for restock approvals, problem tracking, and history review.
+ * Assumption: currentId holds the authenticated Manager ID for logging restock approvals.
+ */
 void facility_Equipment_Menu(char currentId[]){
     int choice;
     do {
@@ -1335,6 +1459,11 @@ void facility_Equipment_Menu(char currentId[]){
 
     return;
 }
+/*
+ * Function: Reports_Financial_Summary
+ * Purpose : Menu-driven controller routing the Manager to executive, personnel, staff, and revenue reports.
+ * Assumption: User enters integer menu choices; non-numeric inputs are cleared safely from stdin.
+ */
 void Reports_Financial_Summary(void) {
     int choice;
     do {
@@ -1378,6 +1507,11 @@ void Reports_Financial_Summary(void) {
 
     return;
 }
+/*
+ * Function: manager_main_menu
+ * Purpose : Serves as the primary navigation hub for the Manager portal after successful authentication.
+ * Assumption: currentId contains a valid authenticated Manager ID and loops until Logout (0) is selected.
+ */
 void manager_main_menu(char currentId[]) {
     int choice;
     do {
@@ -1388,8 +1522,8 @@ void manager_main_menu(char currentId[]) {
         printf("2. Admin & Personnel Oversight\n");
         printf("3. Student & Refund Oversight\n");
         printf("4. Report & Financial Summary\n");
-        printf("6. Change Manager Password\n");
-        printf("7. Register new manager Id\n");
+        printf("5. Change Manager Password\n");
+        printf("6. Register new manager Id\n");
         printf("0. Logout\n");
         printf("Enter your choice: ");
 
@@ -1423,7 +1557,7 @@ void manager_main_menu(char currentId[]) {
                 printf("\nLogging out Manager [%s]...\n", currentId);
                 break;
             default:
-                printf("\nInvalid choice! Please select 0 - 7.\n");
+                printf("\nInvalid choice! Please select 0 - 6.\n");
         }
     } while (choice != 0);
 }
