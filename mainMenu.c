@@ -4,9 +4,11 @@
 #include "admin.h"
 #include "facilities_officer.h"
 #include "manager.h"
+#include "student.h"
 
 // Main Menu
 int main() {
+    
     int choice;
     char currentId[50];
     do {
@@ -35,7 +37,7 @@ int main() {
                 }
                 break;
             case 3:
-                printf("\n[Student Menu module not active in this build.]\n");
+                studentMenu();
                 break;
             case 4:
                 printf("\n[Instructor Menu module not active in this build.]\n");
@@ -54,4 +56,3 @@ int main() {
     } while (choice != 6);
     return 0;
 }
-
