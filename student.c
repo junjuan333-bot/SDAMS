@@ -55,6 +55,20 @@ static int equalsIgnoreCase(const char *a, const char *b) {
     return (*a == '\0' && *b == '\0');
 }
 
+static int isActiveBookingStatus(int status) {
+    return (status == 1 || status == 2);
+}
+
+static const char *bookingStatusLabel(int status) {
+    if (status == 1) {
+        return "Pending";
+    }
+    if (status == 2) {
+        return "Booked";
+    }
+    return "Cancelled";
+}
+
 static int hasActiveBookings(const char *studentId) {
     FILE *fp = fopen(BOOKING_FILE, "r");
     if (fp == NULL) {
@@ -67,7 +81,7 @@ static int hasActiveBookings(const char *studentId) {
         char sId[MAX_ID], cId[MAX_ID];
         int status;
         if (sscanf(line, "%19[^,],%19[^,],%d", sId, cId, &status) == 3) {
-            if (strcmp(sId, studentId) == 0 && status == 1) {
+            if (strcmp(sId, studentId) == 0 && isActiveBookingStatus(status)) {
                 activeCount++;
             }
         }
@@ -90,8 +104,8 @@ static void displayActiveBookings(const char *studentId) {
         char sId[MAX_ID], cId[MAX_ID];
         int status;
         if (sscanf(line, "%19[^,],%19[^,],%d", sId, cId, &status) == 3) {
-            if (strcmp(sId, studentId) == 0 && status == 1) {
-                printf("Class ID: %-10s | Status: Booked\n", cId);
+            if (strcmp(sId, studentId) == 0 && isActiveBookingStatus(status)) {
+                printf("Class ID: %-10s | Status: %s\n", cId, bookingStatusLabel(status));
                 found = 1;
             }
         }
@@ -423,7 +437,7 @@ void bookClass(char *studentId) {
     fprintf(bookFp, "%s,%s,1\n", studentId, targetClass);
     fclose(bookFp);
 
-    printf("Successfully booked class '%s' for Student %s!\n", targetClass, studentId);
+    printf("Booking request submitted for class '%s' (Status: Pending)!\n", targetClass);
 }
 
 void viewMyBookings(char *studentId) {
@@ -441,8 +455,7 @@ void viewMyBookings(char *studentId) {
         int status;
         if (sscanf(line, "%19[^,],%19[^,],%d", sId, cId, &status) == 3) {
             if (strcmp(sId, studentId) == 0) {
-                printf("Class ID: %-10s | Status: %s\n",
-                       cId, (status == 1) ? "Booked" : "Cancelled");
+                printf("Class ID: %-10s | Status: %s\n", cId, bookingStatusLabel(status));
                 found = 1;
             }
         }
@@ -499,7 +512,7 @@ void rescheduleBooking(char *studentId) {
         int status;
         if (sscanf(line, "%19[^,],%19[^,],%d", sId, cId, &status) == 3) {
             if (!updated && strcmp(sId, studentId) == 0 &&
-                equalsIgnoreCase(cId, oldClassId) && status == 1) {
+                equalsIgnoreCase(cId, oldClassId) && isActiveBookingStatus(status)) {
                 fprintf(tempFp, "%s,%s,0\n", sId, cId);
                 fprintf(tempFp, "%s,%s,1\n", studentId, newClassId);
                 updated = 1;
@@ -516,7 +529,7 @@ void rescheduleBooking(char *studentId) {
     rename("temp_bookings.txt", BOOKING_FILE);
 
     if (updated) {
-        printf("Rescheduled from '%s' to '%s' successfully!\n", oldClassId, newClassId);
+        printf("Rescheduled from '%s' to '%s' successfully (Status: Pending)!\n", oldClassId, newClassId);
     } else {
         printf("Active booking for Class ID '%s' not found.\n", oldClassId);
     }
@@ -559,7 +572,7 @@ void cancelBooking(char *studentId) {
         int status;
         if (sscanf(line, "%19[^,],%19[^,],%d", sId, cId, &status) == 3) {
             if (!cancelled && strcmp(sId, studentId) == 0 &&
-                equalsIgnoreCase(cId, targetClassId) && status == 1) {
+                equalsIgnoreCase(cId, targetClassId) && isActiveBookingStatus(status)) {
                 fprintf(tempFp, "%s,%s,0\n", sId, cId);
                 cancelled = 1;
                 continue;
