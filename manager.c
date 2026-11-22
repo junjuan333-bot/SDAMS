@@ -152,11 +152,16 @@ int manager_register() {
     struct User checkUser;
    
     printf("\n--- Register New Manager ---\n");
-    printf("Enter Manager ID: ");
-    scanf(" %[^\n]", newUser.id); 
+    printf("Enter Manager ID (or 0 to cancel): ");
+    scanf(" %49[^\n]", newUser.id); 
+    if (strcmp(newUser.id, "0") == 0) {
+        printf("Registration cancelled.\n");
+        return 0;
+    }
+
     FILE *checkFile = fopen("manager.txt", "r");
     if (checkFile != NULL) {
-        while (fscanf(checkFile, "%[^|]|%[^|]|%[^\n]\n", checkUser.id, checkUser.pass, checkUser.role) != EOF) {
+        while (fscanf(checkFile, "%49[^|]|%49[^|]|%49[^\n]\n", checkUser.id, checkUser.pass, checkUser.role) == 3) {
             if (strcmp(newUser.id, checkUser.id) == 0) {
                 printf("Error: Manager ID '%s' already exists!\n", newUser.id);
                 fclose(checkFile);
@@ -167,7 +172,7 @@ int manager_register() {
     }
     do {
         printf("Enter Manager Password (min 8 chars, 1 upper, 1 lower, 1 digit, 1 special, no '|' or press 0 to exit): ");
-        scanf(" %[^\n]", newUser.pass);
+        scanf(" %49[^\n]", newUser.pass);
 
         if (strcmp(newUser.pass, "0") == 0) {
             printf("Registration cancelled.\n");
@@ -191,8 +196,8 @@ int manager_register() {
 
     printf("Manager registered successfully!\n");
     return 1;
-
 }
+
 /*
  * Function: change_password
  * Purpose : Verifies the logged-in Manager's current password and updates it to a new strong password in manager.txt.
@@ -205,10 +210,10 @@ int change_password(char currentId[]) {
     int found = 0;
     printf("\n--- Change Manager Password ---\n");
     printf("Enter Current Password (or 0 to cancel): ");
-    scanf(" %[^\n]", oldPass);
+    scanf(" %49[^\n]", oldPass);
     if (strcmp(oldPass, "0") == 0) {
-    printf("Password change cancelled.\n");
-    return 0;
+        printf("Password change cancelled.\n");
+        return 0;
     }
 
     FILE *filemanager = fopen("manager.txt", "r");
@@ -216,7 +221,7 @@ int change_password(char currentId[]) {
         printf("Error opening file.\n");
         return 0;
     }
-    while (fscanf(filemanager, "%[^|]|%[^|]|%[^\n]\n", fileData.id, fileData.pass, fileData.role) != EOF) {
+    while (fscanf(filemanager, "%49[^|]|%49[^|]|%49[^\n]\n", fileData.id, fileData.pass, fileData.role) == 3) {
         if (strcmp(currentId, fileData.id) == 0 && 
             strcmp(oldPass, fileData.pass) == 0 && 
             strcmp(fileData.role, "Manager") == 0) {
@@ -226,12 +231,12 @@ int change_password(char currentId[]) {
     }
     fclose(filemanager);
     if (found == 0) {
-        printf("Invalid  Password.\n");
+        printf("Invalid Password.\n");
         return 0;
     }
     do {
         printf("Enter New Password (min 8 chars, 1 upper, 1 lower, 1 digit, 1 special, no '|' or press 0 to exit): ");
-        scanf(" %[^\n]", newPass);
+        scanf(" %49[^\n]", newPass);
 
         if (strcmp(newPass, "0") == 0) {
             printf("Password change cancelled.\n");
@@ -254,12 +259,10 @@ int change_password(char currentId[]) {
         if (tempFile != NULL) fclose(tempFile);
         return 0;
     }
-    while (fscanf(filemanager, "%[^|]|%[^|]|%[^\n]\n", fileData.id, fileData.pass, fileData.role) != EOF) {
+    while (fscanf(filemanager, "%49[^|]|%49[^|]|%49[^\n]\n", fileData.id, fileData.pass, fileData.role) == 3) {
         if (strcmp(currentId, fileData.id) == 0 && strcmp(fileData.role, "Manager") == 0) {
-
             fprintf(tempFile, "%s|%s|%s\n", fileData.id, newPass, fileData.role);
         } else {
-    
             fprintf(tempFile, "%s|%s|%s\n", fileData.id, fileData.pass, fileData.role);
         }
     }
