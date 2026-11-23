@@ -1,66 +1,34 @@
+/*
+ * File: facilities_officer.c
+ * Module: Facilities Officer Module - Self Defence Academy Management System (SDAMS)
+ * Description: Implements facilities officer authentication, equipment inventory management, facility problem management, and reporting.
+ */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 #include "facilities_officer.h"
 
-#define FO_MAX_ID 10
-#define FO_MAX_NAME 50
-#define FO_MAX_CATEGORY 30
-#define FO_MAX_DESC 100
-#define FO_MAX_STATUS 20
-#define FO_MAX_DATE 15
-#define LOW_STOCK_THRESHOLD 5
+/* =========================================================================
+   HELPER & VALIDATION FUNCTIONS
+   ========================================================================= */
 
-#define INVENTORY_FILE "inventory.txt"
-#define PROBLEMS_FILE "facility_problems.txt"
-#define FO_TEMP_FILE "fo_temp.txt"
-
-/* Structure Declarations */
-typedef struct {
-    char equipmentID[FO_MAX_ID];     
-    char name[FO_MAX_NAME];          
-    char category[FO_MAX_CATEGORY];  
-    int quantity;                    
-    double unitCost;                 
-    char status[FO_MAX_STATUS];      
-} Equipment;
-
-typedef struct {
-    char problemID[FO_MAX_ID];       
-    char facilityName[FO_MAX_NAME];  
-    char description[FO_MAX_DESC];   
-    char reportedBy[FO_MAX_NAME];    
-    char dateReported[FO_MAX_DATE];  
-    char status[FO_MAX_STATUS];      
-} FacilityProblem;
-
-/* Function Prototypes */
-void facilitiesOfficerMenu(void);
-void addEquipment(void);
-void viewEquipment(void);
-void searchEquipment(void);
-void updateEquipment(void);
-void viewFacilityProblems(void);
-void searchFacilityProblems(void);
-void updateProblemStatus(void);
-void generateStockReport(void);
-
-void foClearBuffer(void);
-void foReadString(const char *prompt, char *buffer, int size);
-int foValidateID(const char *id, const char *prefix);
-int isEquipmentIDExists(const char *id);
-
-/* Helper Functions */
+/* Function: foClearBuffer
+ * Assumption: Standard input stream (stdin) may contain residual newline 
+ * or invalid characters after formatted input scans. */
 void foClearBuffer(void) {
     int c;
     while ((c = getchar()) != '\n' && c != EOF);
 }
 
+/* Function: foReadString
+ * Assumption: Pointer 'buffer' points to a valid character array of at least 
+ * 'size' bytes, and user input does not exceed the defined buffer size. */
 void foReadString(const char *prompt, char *buffer, int size) {
+    size_t len;
     printf("%s", prompt);
     if (fgets(buffer, size, stdin) != NULL) {
-        size_t len = strlen(buffer);
+        len = strlen(buffer);
         if (len > 0 && buffer[len - 1] == '\n') {
             buffer[len - 1] = '\0';
         } else {
@@ -69,6 +37,9 @@ void foReadString(const char *prompt, char *buffer, int size) {
     }
 }
 
+/* Function: foValidateID
+ * Assumption: All valid system primary keys strictly follow a 5-character 
+ * format consisting of a 2-letter uppercase prefix followed by 3 digits. */
 int foValidateID(const char *id, const char *prefix) {
     if (strlen(id) != 5) return 0;
     if (strncmp(id, prefix, 2) != 0) return 0;
@@ -76,10 +47,14 @@ int foValidateID(const char *id, const char *prefix) {
     return 1;
 }
 
+/* Function: isEquipmentIDExists
+ * Assumption: If 'inventory.txt' exists, its records are formatted with 
+ * pipe ('|') delimiters and each Equipment ID is unique. */
 int isEquipmentIDExists(const char *id) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
-    if (fp == NULL) return 0;
     Equipment temp;
+    if (fp == NULL) return 0;
+    
     while (fscanf(fp, "%9[^|]|%49[^|]|%29[^|]|%d|%lf|%19[^\n]\n",
                   temp.equipmentID, temp.name, temp.category,
                   &temp.quantity, &temp.unitCost, temp.status) == 6) {
@@ -92,20 +67,27 @@ int isEquipmentIDExists(const char *id) {
     return 0;
 }
 
-/* Facilities Officer Login */
-int facilitiesOfficerLogin() {
+/* =========================================================================
+   AUTHENTICATION & NAVIGATION MENU
+   ========================================================================= */
+
+/* Function: facilitiesOfficerLogin
+ * Assumption: Default credentials ('facilities' / '1234') are pre-assigned 
+ * to the Facilities Officer role and contain no whitespace characters. */
+int facilitiesOfficerLogin(void) {
     char username[20];
     char password[20];
     
     printf("\n========================================\n");
-    printf("|        Facilities Officer LOGIN         |\n");
+    printf("|        Facilities Officer LOGIN        |\n");
     printf("========================================\n");
-    printf("Enter Username (default: facilities): ");
-    scanf("%s", username);
-    printf("Enter Password (default: 1234): ");
-    scanf("%s", password);
+    printf("Enter Username: ");
+    scanf("%19s", username);
+    printf("Enter Password: ");
+    scanf("%19s", password);
+    foClearBuffer();
     
-    if (strcmp(username, "facilities") == 0 && strcmp(password, "1234") == 0) {
+    if (strcmp(username, "JunJie") == 0 && strcmp(password, "JJ@156935") == 0) {
         printf("\nLogin Successful! Welcome Facilities Officer.\n");
         return 1;
     } else {
@@ -114,7 +96,9 @@ int facilitiesOfficerLogin() {
     }
 }
 
-/* Navigation Dashboard */
+/* Function: facilitiesOfficerMenu
+ * Assumption: The user is already authenticated before accessing this menu 
+ * and will navigate options using integer inputs between 0 and 8. */
 void facilitiesOfficerMenu(void) {
     int choice;
     do {
@@ -162,9 +146,17 @@ void facilitiesOfficerMenu(void) {
     } while (choice != 0);
 }
 
-/* Module A implementations */
+/* =========================================================================
+   MODULE A: EQUIPMENT INVENTORY MANAGEMENT
+   ========================================================================= */
+
+/* Function: addEquipment
+ * Assumption: The local directory has write permissions to create or append 
+ * to 'inventory.txt'. Any item with quantity below LOW_STOCK_THRESHOLD (5) 
+ * is assumed to require immediate 'Low Stock' status tagging. */
 void addEquipment(void) {
     Equipment eq;
+    EquipmentMetric metric; /* Using Union (Requirement iv) */
     FILE *fp;
     printf("\n--- [1] ADD NEW EQUIPMENT ---\n");
 
@@ -213,7 +205,9 @@ void addEquipment(void) {
 
     if (eq.quantity < LOW_STOCK_THRESHOLD) {
         strcpy(eq.status, "Low Stock");
-        printf("[i] Quantity is below %d. Status automatically set to 'Low Stock'.\n", LOW_STOCK_THRESHOLD);
+        metric.unitDeficit = LOW_STOCK_THRESHOLD - eq.quantity;
+        printf("[i] Quantity is below %d (Deficit: %d unit(s)). Status automatically set to 'Low Stock'.\n",
+               LOW_STOCK_THRESHOLD, metric.unitDeficit);
     } else {
         foReadString("Enter Condition Status (Available / Damaged): ", eq.status, FO_MAX_STATUS);
         if (strlen(eq.status) == 0) strcpy(eq.status, "Available");
@@ -229,6 +223,9 @@ void addEquipment(void) {
     printf("[OK] Equipment '%s' (%s) added successfully!\n", eq.name, eq.equipmentID);
 }
 
+/* Function: viewEquipment
+ * Assumption: 'inventory.txt' resides in the current working directory and 
+ * contains valid 6-column pipe-delimited equipment records. */
 void viewEquipment(void) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
     Equipment eq;
@@ -250,6 +247,9 @@ void viewEquipment(void) {
     fclose(fp);
 }
 
+/* Function: searchEquipment
+ * Assumption: Search matching is case-sensitive and matches either an exact 
+ * Equipment ID or a substring within the Equipment Name. */
 void searchEquipment(void) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
     Equipment eq;
@@ -277,6 +277,9 @@ void searchEquipment(void) {
     fclose(fp);
 }
 
+/* Function: updateEquipment
+ * Assumption: Equipment IDs and Names are immutable once registered; only 
+ * Quantity, Unit Cost, and Condition Status can be updated via temp file replacement. */
 void updateEquipment(void) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
     FILE *tempFp = fopen(FO_TEMP_FILE, "w");
@@ -316,7 +319,13 @@ void updateEquipment(void) {
     else { remove(FO_TEMP_FILE); printf("[!] Equipment ID '%s' not found.\n", targetID); }
 }
 
-/* Module B implementations */
+/* =========================================================================
+   MODULE B: FACILITY PROBLEM MANAGEMENT
+   ========================================================================= */
+
+/* Function: viewFacilityProblems
+ * Assumption: 'facility_problems.txt' is populated by the Instructor module 
+ * using a 6-field pipe-delimited structure. */
 void viewFacilityProblems(void) {
     FILE *fp = fopen(PROBLEMS_FILE, "r");
     FacilityProblem prob;
@@ -338,6 +347,9 @@ void viewFacilityProblems(void) {
     fclose(fp);
 }
 
+/* Function: searchFacilityProblems
+ * Assumption: Users search facility tickets by providing either an exact 
+ * Problem ID (e.g., FP001) or an exact resolution status string. */
 void searchFacilityProblems(void) {
     FILE *fp = fopen(PROBLEMS_FILE, "r");
     FacilityProblem prob;
@@ -365,6 +377,9 @@ void searchFacilityProblems(void) {
     fclose(fp);
 }
 
+/* Function: updateProblemStatus
+ * Assumption: Only the resolution status of a reported problem can be modified 
+ * by the Facilities Officer; original incident details remain unchanged. */
 void updateProblemStatus(void) {
     FILE *fp = fopen(PROBLEMS_FILE, "r");
     FILE *tempFp = fopen(FO_TEMP_FILE, "w");
@@ -398,13 +413,22 @@ void updateProblemStatus(void) {
     else { remove(FO_TEMP_FILE); printf("[!] Problem ID '%s' not found.\n", targetID); }
 }
 
-/* Module C implementations */
+/* =========================================================================
+   MODULE C: REPORTING
+   ========================================================================= */
+
+/* Function: generateStockReport
+ * Assumption: Financial valuation is calculated as Quantity * Unit Cost, and 
+ * any item with quantity < LOW_STOCK_THRESHOLD (5) requires restock flagging. */
 void generateStockReport(void) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
     Equipment eq;
+    EquipmentMetric metric; /* Using Union (Requirement iv) */
     int filterOption, totalItems = 0, lowStockCount = 0;
     char filterKeyword[FO_MAX_NAME] = "";
     double totalValuation = 0.0;
+    const char *alertFlag;
+
     printf("\n--- [8] EQUIPMENT INVENTORY STOCK REPORT ---\n");
     if (fp == NULL) {
         printf("[i] No inventory data available to generate report.\n");
@@ -426,12 +450,12 @@ void generateStockReport(void) {
         if (filterOption == 2 && strcmp(eq.equipmentID, filterKeyword) != 0 && strstr(eq.name, filterKeyword) == NULL) continue;
         if (filterOption == 3 && eq.quantity >= LOW_STOCK_THRESHOLD) continue;
 
-        double itemValuation = eq.quantity * eq.unitCost;
-        const char *alertFlag = (eq.quantity < LOW_STOCK_THRESHOLD) ? "[! LOW STOCK !]" : "OK";
-        printf("%-8s | %-20s | %-10s | %-6d | %-9.2f | %-11.2f | %-16s\n", eq.equipmentID, eq.name, eq.category, eq.quantity, eq.unitCost, itemValuation, alertFlag);
+        metric.itemValuation = eq.quantity * eq.unitCost;
+        alertFlag = (eq.quantity < LOW_STOCK_THRESHOLD) ? "[! LOW STOCK !]" : "OK";
+        printf("%-8s | %-20s | %-10s | %-6d | %-9.2f | %-11.2f | %-16s\n", eq.equipmentID, eq.name, eq.category, eq.quantity, eq.unitCost, metric.itemValuation, alertFlag);
 
         totalItems += eq.quantity;
-        totalValuation += itemValuation;
+        totalValuation += metric.itemValuation;
         if (eq.quantity < LOW_STOCK_THRESHOLD) lowStockCount++;
     }
     printf("====================================================================================================\n");
