@@ -57,6 +57,7 @@ void updateProblemStatus(void);
 void generateStockReport(void);     
 
 /* Internal Helper and Validation Functions */
+void generateNextEquipmentID(char *newID);
 void foClearBuffer(void);
 void foReadString(const char *prompt, char *buffer, int size);
 int foValidateID(const char *id, const char *prefix);

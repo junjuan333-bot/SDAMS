@@ -13,6 +13,32 @@
    HELPER & VALIDATION FUNCTIONS
    ========================================================================= */
 
+/* Function: generateNextEquipmentID
+ * Assumption: Existing equipment IDs in 'inventory.txt' follow the 'EQxxx'
+ * numeric pattern. If the file does not exist or is empty, numbering starts at EQ001. */
+void generateNextEquipmentID(char *newID) {
+    FILE *fp = fopen(INVENTORY_FILE, "r");
+    Equipment temp;
+    int maxNum = 0;
+    int currentNum = 0;
+
+    if (fp != NULL) {
+        while (fscanf(fp, "%9[^|]|%49[^|]|%29[^|]|%d|%lf|%19[^\n]\n",
+                      temp.equipmentID, temp.name, temp.category,
+                      &temp.quantity, &temp.unitCost, temp.status) == 6) {
+            if (strncmp(temp.equipmentID, "EQ", 2) == 0) {
+                currentNum = atoi(temp.equipmentID + 2);
+                if (currentNum > maxNum) {
+                    maxNum = currentNum;
+                }
+            }
+        }
+        fclose(fp);
+    }
+
+    sprintf(newID, "EQ%03d", maxNum + 1);
+}
+
 /* Function: foClearBuffer
  * Assumption: Standard input stream (stdin) may contain residual newline 
  * or invalid characters after formatted input scans. */
@@ -151,27 +177,19 @@ void facilitiesOfficerMenu(void) {
    ========================================================================= */
 
 /* Function: addEquipment
- * Assumption: The local directory has write permissions to create or append 
- * to 'inventory.txt'. Any item with quantity below LOW_STOCK_THRESHOLD (5) 
- * is assumed to require immediate 'Low Stock' status tagging. */
+ * Assumption: The local directory has write permissions to create or append
+ * to 'inventory.txt'. Equipment IDs are auto-generated sequentially to prevent
+ * duplication, and items with quantity < LOW_STOCK_THRESHOLD (5) are tagged 'Low Stock'. */
 void addEquipment(void) {
     Equipment eq;
     EquipmentMetric metric; /* Using Union (Requirement iv) */
     FILE *fp;
+
     printf("\n--- [1] ADD NEW EQUIPMENT ---\n");
 
-    while (1) {
-        foReadString("Enter Equipment ID (Format EQxxx, e.g., EQ001): ", eq.equipmentID, FO_MAX_ID);
-        if (!foValidateID(eq.equipmentID, "EQ")) {
-            printf("[!] Error: ID must start with 'EQ' followed by 3 digits (e.g., EQ001).\n");
-            continue;
-        }
-        if (isEquipmentIDExists(eq.equipmentID)) {
-            printf("[!] Error: Equipment ID '%s' already exists!\n", eq.equipmentID);
-            continue;
-        }
-        break;
-    }
+    /* Auto-generate next sequential Equipment ID */
+    generateNextEquipmentID(eq.equipmentID);
+    printf("[i] Auto-Generated Equipment ID: %s\n", eq.equipmentID);
 
     do {
         foReadString("Enter Equipment Name (e.g., Karate Mats): ", eq.name, FO_MAX_NAME);
