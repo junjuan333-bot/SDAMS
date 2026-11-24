@@ -147,7 +147,7 @@ int manager_log_system(char loggedInId[]) {
  * Purpose : Registers a new Manager account after checking for duplicate IDs and validating password strength.
  * Assumption: manager.txt stores valid pipe-delimited records (ID|Password|Role) and IDs are unique.
  */
-int manager_register() {
+int manager_register(void) {
     struct User newUser;
     struct User checkUser;
    
@@ -458,7 +458,7 @@ int approve_Restock(char currentId[]){
  * Purpose : Reads facility_problems.txt and displays all facility issues whose status is not "Resolved".
  * Assumption: facility_problems.txt follows the 6-field pipe-delimited format and uses "Resolved" for closed cases.
  */
-int Unresolved_Problems() {
+int Unresolved_Problems(void) {
     struct FacilityProblem fileData;
     int count=0;
 FILE*fc=fopen("facility_problems.txt","r");
@@ -494,7 +494,7 @@ return 1;
  * Purpose : Generates a combined audit report of equipment inventory valuation, low-stock alerts, and facility problem counts.
  * Assumption: Equipment items with quantity < 5 or status "Low Stock"/"Damaged" require restock attention.
  */
-int overall_facility(){
+int overall_facility(void){
     struct Inventory fileData;
     struct FacilityProblem fileDatae;
     int totalItems = 0, totalUnits = 0, alertCount = 0;
@@ -603,7 +603,7 @@ void view_restock_history(void) {
  * Purpose : Aggregates active personnel, revenue, salaries, restock costs, and refunds to compute net profit.
  * Assumption: Each active instructor receives a fixed monthly salary defined by INSTRUCTOR_MONTHLY_SALARY.
  */
-int view_Dojo_Executive_Summary(){
+int view_Dojo_Executive_Summary(void){
     struct instructor inst;
     struct student stu;
     struct payment pay;
@@ -714,7 +714,7 @@ double totalSalaryExpense = activeInst * INSTRUCTOR_MONTHLY_SALARY;
  * Purpose : Scans instructors.txt and students.txt to list all personnel marked as "Not_Active".
  * Assumption: Inactive accounts use the standardized status string "Not_Active".
  */
-int view_Inactive_Personnel(){
+int view_Inactive_Personnel(void){
     struct instructor inst;
     struct student stu;
     int totalinactive = 0;
@@ -773,7 +773,7 @@ int view_Inactive_Personnel(){
  * Purpose : Reads payments.txt to display all student fee transactions and calculates cumulative tuition revenue.
  * Assumption: Each line in payments.txt contains PaymentID, StudentID, Amount, and PaymentDate separated by spaces.
  */
-int view_payment_History(){
+int view_payment_History(void){
     struct payment pay;
     int totalPay = 0;
     double totalAmount = 0.0;
@@ -807,7 +807,7 @@ if (totalPay == 0) {
  * Purpose : Creates a new administrator account, validates password strength, and appends it to admin.txt.
  * Assumption: New administrator IDs are unique and input fields do not contain pipe ('|') delimiters.
  */
-int admin_register() {
+int admin_register(void) {
     struct Admin newUser;
     struct Admin checkUser;
     int maxId = 0;
@@ -866,7 +866,7 @@ int admin_register() {
  * Purpose : Displays existing administrator accounts and updates/removes a selected admin record via a temporary file.
  * Assumption: Updating records safely uses a temporary file (temp.txt) before replacing admin.txt.
  */
-int admin_fired_sys(){
+int admin_fired_sys(void){
     struct Admin fileData;
     char targetId[50];
     int found = 0;
@@ -925,7 +925,7 @@ int admin_fired_sys(){
  * Purpose : Displays pending student refund requests and allows the Manager to approve or reject them.
  * Assumption: Refund records in refund_requests.txt follow the 6-field pipe-delimited schema.
  */
-int manage_refund_sys() {
+int manage_refund_sys(void) {
     struct RefundRequest fileData;
     char targetId[20];
     int found = 0;
@@ -1028,7 +1028,7 @@ int manage_refund_sys() {
  * Purpose : Scans students.txt to list all active students and summarizes active versus inactive enrollment counts.
  * Assumption: Active student records are marked with the status string "Active" (case-insensitive).
  */
-int view_Student_Enrollment(){
+int view_Student_Enrollment(void){
     struct student stu;
     int totalStu = 0, activeStu = 0;
 
@@ -1060,7 +1060,7 @@ int view_Student_Enrollment(){
  * Purpose : Reads refund_requests.txt in read-only mode to display all historical refund requests and statuses.
  * Assumption: refund_requests.txt is accessible in the working directory when records exist.
  */
-int view_refund_his(){
+int view_refund_his(void){
     struct RefundRequest fileData;
     FILE*fhistory=fopen("refund_requests.txt", "r");
     if (fhistory == NULL) {
@@ -1326,7 +1326,7 @@ int revenue_report(void) {
  * Purpose : Displays the Student & Refund Oversight submenu and dispatches user choices to enrollment, refund, or payment functions.
  * Assumption: User enters integer menu choices; non-numeric inputs are cleared from stdin to prevent infinite loops.
  */
-void student_oversight_menu() {
+void student_oversight_menu(void) {
     int choice;
 
     do {
