@@ -5,6 +5,14 @@
  */
 #include "instructor.h"
 
+struct Instructor {
+    char id[MAX_ID_LEN];
+    char name[MAX_NAME_LEN];
+    char role[MAX_NAME_LEN];
+    char contact[MAX_ID_LEN];
+    char status[MAX_STATUS_LEN];
+};
+
 static int parse_instructor_line(const char line[], struct Instructor *inst) {
     char buf[256];
     strncpy(buf, line, sizeof(buf) - 1);
