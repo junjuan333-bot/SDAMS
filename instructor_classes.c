@@ -5,6 +5,18 @@
  */
 #include "instructor.h"
 
+struct ClassSchedule {
+    char classId[MAX_ID_LEN];
+    char className[MAX_NAME_LEN];
+    char instructorId[MAX_ID_LEN];
+    char date[MAX_DATE_LEN];
+    char time[MAX_TIME_LEN];
+};
+
+union ClassSearchFilter {
+    char keyword[MAX_NAME_LEN];
+};
+
 static void generate_next_class_id(char nextId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
     struct ClassSchedule temp;
