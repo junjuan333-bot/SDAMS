@@ -1,1 +1,1 @@
-EQ001|Karate Mats|Mats|1|10.00|Low Stock
+EQ001|Karate Mats|Mats|3|12.00|Active

@@ -1,3 +1,0 @@
-EQ002|Sparring Gloves|Gear|3|85.50|Low Stock
-EQ004|Heavy Punching Bag|Equipment|2|350.00|Damaged
-EQ005|Wooden Bo Staff|Weapons|4|45.00|Low Stock

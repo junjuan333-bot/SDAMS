@@ -5,6 +5,7 @@
 #include "facilities_officer.h"
 #include "manager.h"
 #include "student.h"
+#include "instructor.h"
 
 // Main Menu
 int main() {
@@ -40,7 +41,8 @@ int main() {
                 studentMenu();
                 break;
             case 4:
-                printf("\n[Instructor Menu module not active in this build.]\n");
+                instructor_login_portal();
+
                 break;
             case 5:
                 if (facilitiesOfficerLogin()) {

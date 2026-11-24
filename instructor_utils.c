@@ -58,3 +58,8 @@ int inst_contains_ignore_case(const char haystack[], const char needle[]) {
     }
     return 0;
 }
+
+void instructor_rating_menu(const char currentId[]) {
+    (void)currentId;
+    printf("\n[Info] Instructor Rating module is currently unavailable.\n");
+}
