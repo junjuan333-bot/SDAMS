@@ -5,6 +5,15 @@
  */
 #include "instructor.h"
 
+struct FacilityProblem {
+    char problemID[MAX_ID_LEN];
+    char description[MAX_DESC_LEN];
+    char status[MAX_STATUS_LEN];
+    char reportedBy[MAX_NAME_LEN];
+    char reportedDate[MAX_DATE_LEN];
+    char facilityName[MAX_NAME_LEN];
+};
+
 static void generate_next_problem_id(char nextId[]) {
     FILE *fp = fopen(PROBLEM_FILE, "r");
     struct FacilityProblem temp;
