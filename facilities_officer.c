@@ -441,7 +441,7 @@ void updateProblemStatus(void) {
 void generateStockReport(void) {
     FILE *fp = fopen(INVENTORY_FILE, "r");
     Equipment eq;
-    EquipmentMetric metric; /* Using Union (Requirement iv) */
+    EquipmentMetric metric; /* Using Union */
     int filterOption, totalItems = 0, lowStockCount = 0;
     char filterKeyword[FO_MAX_NAME] = "";
     double totalValuation = 0.0;

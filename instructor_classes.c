@@ -213,7 +213,7 @@ void view_class_schedules(const char currentId[]) {
 void search_class_schedule(const char currentId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
     struct ClassSchedule cls;
-    union SearchFilter filter;
+    union ClassSearchFilter filter;
     int searchBy;
     int found = 0;
 
