@@ -24,8 +24,14 @@ int main() {
         printf("| 6. Exit Application                   |\n");
         printf("=========================================\n");
         printf("Enter your choice: ");
-        scanf("%d", &choice);
         
+        if (scanf("%d", &choice) != 1) {
+            while (getchar() != '\n'); 
+            choice = -1;   
+        } else {
+            while (getchar() != '\n');
+        }    
+
         switch (choice) {
             case 1:
                 if (manager_log_system(currentId) == 1) { 
