@@ -98,7 +98,7 @@ int isEquipmentIDExists(const char *id) {
    ========================================================================= */
 
 /* Function: facilitiesOfficerLogin
- * Assumption: Default credentials ('facilities' / '1234') are pre-assigned 
+ * Assumption: Default credentials ('JunJie' / 'JJ@156935') are pre-assigned 
  * to the Facilities Officer role and contain no whitespace characters. */
 int facilitiesOfficerLogin(void) {
     char username[20];

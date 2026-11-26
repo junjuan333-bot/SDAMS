@@ -1,7 +1,7 @@
 #ifndef FACILITIES_OFFICER_H
 #define FACILITIES_OFFICER_H
 
-/* Symbolic Constants (Requirement ii) */
+/* Symbolic Constants */
 #define FO_MAX_ID 10
 #define FO_MAX_NAME 50
 #define FO_MAX_CATEGORY 30
