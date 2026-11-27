@@ -47,6 +47,7 @@ struct student{
     char course[50];
     char contact[15];
     char status[20];
+    char pass[50];
     };
 struct payment{
     int Id;
@@ -646,7 +647,7 @@ int view_Dojo_Executive_Summary(void){
     printf("\n==================== ACTIVE STUDENTS ====================\n");
     printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Course", "Phone Number");
     printf("------------------------------------------------------------\n");
-    while (fscanf(fstu, "%d %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status) == 5) {
+    while (fscanf(fstu, "%d %s %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status, stu.pass) == 6) {
         totalStu++;
         if (isSameIgnoreCase(stu.status, "Active") == 1) {
             activeStu++;
@@ -751,7 +752,7 @@ int view_Inactive_Personnel(void){
     printf("\n==================== INACTIVE STUDENTS ====================\n");
     printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Course", "Phone Number");
     printf("------------------------------------------------------------\n");
-    while(fscanf(fstu, "%d %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status) == 5) {
+    while(fscanf(fstu, "%d %s %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status, stu.pass) == 6) {
         if (isSameIgnoreCase(stu.status, "Not_Active") == 1) {
             printf("%-10d | %-15s | %-15s | %-15s\n", stu.id, stu.name, stu.course, stu.contact);
             totalinactivestu++;
@@ -1041,7 +1042,7 @@ int view_Student_Enrollment(void){
     printf("\n==================== ACTIVE STUDENTS ====================\n");
     printf("%-10s | %-15s | %-15s | %-15s\n", "ID", "Name", "Course", "Phone Number");
     printf("------------------------------------------------------------\n");
-    while (fscanf(fstu, "%d %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status) == 5) {
+    while (fscanf(fstu, "%d %s %s %s %s %s", &stu.id, stu.name, stu.course, stu.contact, stu.status, stu.pass) == 6) {
         totalStu++;
         if (isSameIgnoreCase(stu.status, "Active") == 1) {
             activeStu++;
