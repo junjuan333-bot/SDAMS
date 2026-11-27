@@ -127,7 +127,7 @@ static int parse_instructor_line(const char line[], struct Instructor *inst) {
     return 0;
 }
 
-# Login Part
+// Login Part
 
 int instructorLogin(char currentId[], char currentName[]) {
     char inputId[MAX_ID_LEN];
@@ -196,7 +196,7 @@ int instructorLogin(char currentId[], char currentName[]) {
     }
 }
 
-# Classes Management (Add / View / Search / Update)
+// Classes Management (Add / View / Search / Update)
 
 static void generate_next_class_id(char nextId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
@@ -466,7 +466,7 @@ static void class_schedule_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-# Facilities Problems Report
+// Facilities Problems Report
 
 static void generate_next_problem_id(char nextId[]) {
     FILE *fp = fopen(PROBLEM_FILE, "r");
@@ -615,7 +615,7 @@ static void facility_problem_menu(const char currentName[]) {
     } while (choice != 0);
 }
 
-# Instructor Ratings
+// Instructor Ratings
 
 static void view_instructor_ratings(const char currentId[]) {
     FILE *fp = fopen(RATING_FILE, "r");
@@ -727,7 +727,7 @@ static void instructor_rating_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-# Instructor's Main Menu
+// Instructor's Main Menu
 
 void instructorMenu(const char currentId[], const char currentName[]) {
     int choice;

@@ -18,6 +18,7 @@ struct Student {
     char info[50];
     char contact[20];
     char status[15]; // "Active" or "Not_Active"
+    char password[30];
 } std;
 
 struct Payment {
@@ -442,9 +443,15 @@ int addStudent() {
         fclose(fp);
         return 0;
     }
+    printf("Enter Password: ");
+    if (scanf("%s", std.password) != 1) {
+        printf("\nInvalid password format.\n");
+        fclose(fp);
+        return 0;
+    }
     strcpy(std.status, "Active");
-    
-    fprintf(fp, "%d %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status);
+
+    fprintf(fp, "%d %s %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status, std.password);
     fclose(fp);
     printf("\nStudent added successfully!\n");
     return 1;
@@ -459,12 +466,12 @@ int viewStudents() {
         return 0;
     }
     
-    printf("\n--------------------------------------------------------\n");
-    printf("%-5s %-15s %-15s %-10s %-10s\n", "ID", "Name", "Info", "Contact", "Status");
-    printf("--------------------------------------------------------\n");
+    printf("\n---------------------------------------------------------------------\n");
+    printf("%-5s %-15s %-15s %-10s %-10s %-15s\n", "ID", "Name", "Info", "Contact", "Status", "Password");
+    printf("---------------------------------------------------------------------\n");
     
-    while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) != EOF) {
-        printf("%-5d %-15s %-15s %-10s %-10s\n", std.id, std.name, std.info, std.contact, std.status);
+    while (fscanf(fp, "%d %s %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status, std.password) != EOF) {
+        printf("%-5d %-15s %-15s %-10s %-10s %-15s\n", std.id, std.name, std.info, std.contact, std.status, std.password);
     }
     
     fclose(fp);
@@ -514,7 +521,7 @@ int searchStudent() {
         return 0;
     }
 
-    while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) == 5) {
+    while (fscanf(fp, "%d %s %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status, std.password) == 6) {
         int match = 0;
 
         if (choice == 1 && std.id == searchId) {
@@ -529,8 +536,8 @@ int searchStudent() {
 
         if (match) {
             printf("\n--- Student Record Found ---\n");
-            printf("ID     : %d\nName   : %s\nInfo   : %s\nContact: %s\nStatus : %s\n",
-                   std.id, std.name, std.info, std.contact, std.status);
+            printf("ID     : %d\nName   : %s\nInfo   : %s\nContact: %s\nStatus : %s\nPassword : %s\n",
+                   std.id, std.name, std.info, std.contact, std.status, std.password);
             found = 1;
 
             if (choice == 1) {
@@ -572,19 +579,19 @@ int updateStudent() {
         return 0;
     }
 
-    while (fscanf(fp, "%d %s %s %s %s", &std.id, std.name, std.info, std.contact, std.status) != EOF) {
+    while (fscanf(fp, "%d %49s %49s %19s %14s %29s", &std.id, std.name, std.info, std.contact, std.status, std.password) == 6) {
         if (std.id == searchId) {
             found = 1;
             printf("Current Status for %s: %s\n", std.name, std.status);
             printf("Enter new status (Active / Not_Active): ");
-            if (scanf("%s", std.status) != 1) {
+            if (scanf("%14s", std.status) != 1) {
                 printf("\nInvalid status format.\n");
                 fclose(fp);
                 fclose(tempFp);
                 return 0;
             }
         }
-        fprintf(tempFp, "%d %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status);
+        fprintf(tempFp, "%d %s %s %s %s %s\n", std.id, std.name, std.info, std.contact, std.status, std.password);
     }
     
     fclose(fp);

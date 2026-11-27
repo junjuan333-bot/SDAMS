@@ -1,6 +1,6 @@
-201 JunHee Karate 0121112222 Active
-202 Kenneth Taekwondo 0133334444 Active
-203 Jadrian Judo 0145556666 Not_Active
-204 Aisyah MuayThai 0167778888 Active
-205 Kevin Karate 0189990000 Not_Active
-106 jack karate 666666666 Active
+201 JunHee Karate 0121112222 Active pass123
+202 Kenneth Taekwondo 0133334444 Active pass456
+203 Jadrian Judo 0145556666 Not_Active pass789
+204 Aisyah MuayThai 0167778888 Active pass111
+205 Kevin Karate 0189990000 Not_Active pass222
+106 jack karate 666666666 Active pass333
