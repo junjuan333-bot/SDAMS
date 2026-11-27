@@ -11,7 +11,7 @@
 int main() {
     
     int choice;
-    char currentId[50];
+    char currentId[50], instId[20], instName[50];
     do {
         printf("\n=========================================\n");
         printf("|  SELF DEFENCE ACADEMY SYSTEM (SDAMS)  |\n");
@@ -47,8 +47,9 @@ int main() {
                 studentMenu();
                 break;
             case 4:
-                instructor_login_portal();
-
+                if (instructorLogin(instId, instName)) {
+                    instructorMenu(instId, instName);
+                }
                 break;
             case 5:
                 if (facilitiesOfficerLogin()) {
