@@ -6,12 +6,12 @@
  */
 #include "instructor.h"
 
-#define MAX_ID_LEN 20
-#define MAX_NAME_LEN 50
-#define MAX_DESC_LEN 100
-#define MAX_DATE_LEN 20
-#define MAX_TIME_LEN 10
-#define MAX_STATUS_LEN 20
+#define INST_MAX_ID_LEN 20
+#define INST_MAX_NAME_LEN 50
+#define INST_MAX_DESC_LEN 100
+#define INST_MAX_DATE_LEN 20
+#define INST_MAX_TIME_LEN 10
+#define INST_MAX_STATUS_LEN 20
 
 #define INSTRUCTOR_FILE "instructors.txt"
 #define CLASS_FILE "classes.txt"
@@ -20,41 +20,41 @@
 #define TEMP_FILE "temp_instructor.txt"
 
 struct Instructor {
-    char id[MAX_ID_LEN];
-    char name[MAX_NAME_LEN];
-    char role[MAX_NAME_LEN];
-    char contact[MAX_ID_LEN];
-    char status[MAX_STATUS_LEN];
+    char id[INST_MAX_ID_LEN];
+    char name[INST_MAX_NAME_LEN];
+    char role[INST_MAX_NAME_LEN];
+    char contact[INST_MAX_ID_LEN];
+    char status[INST_MAX_STATUS_LEN];
 };
 
 struct ClassSchedule {
-    char classId[MAX_ID_LEN];
-    char className[MAX_NAME_LEN];
-    char instructorId[MAX_ID_LEN];
-    char date[MAX_DATE_LEN];
-    char time[MAX_TIME_LEN];
+    char classId[INST_MAX_ID_LEN];
+    char className[INST_MAX_NAME_LEN];
+    char instructorId[INST_MAX_ID_LEN];
+    char date[INST_MAX_DATE_LEN];
+    char time[INST_MAX_TIME_LEN];
 };
 
 struct FacilityProblem {
-    char problemID[MAX_ID_LEN];
-    char description[MAX_DESC_LEN];
-    char status[MAX_STATUS_LEN];
-    char reportedBy[MAX_NAME_LEN];
-    char reportedDate[MAX_DATE_LEN];
-    char facilityName[MAX_NAME_LEN];
+    char problemID[INST_MAX_ID_LEN];
+    char description[INST_MAX_DESC_LEN];
+    char status[INST_MAX_STATUS_LEN];
+    char reportedBy[INST_MAX_NAME_LEN];
+    char reportedDate[INST_MAX_DATE_LEN];
+    char facilityName[INST_MAX_NAME_LEN];
 };
 
 struct InstructorRating {
-    char ratingId[MAX_ID_LEN];
-    char studentId[MAX_ID_LEN];
-    char instructorId[MAX_ID_LEN];
-    char classId[MAX_ID_LEN];
+    char ratingId[INST_MAX_ID_LEN];
+    char studentId[INST_MAX_ID_LEN];
+    char instructorId[INST_MAX_ID_LEN];
+    char classId[INST_MAX_ID_LEN];
     int score;
-    char comment[MAX_DESC_LEN];
+    char comment[INST_MAX_DESC_LEN];
 };
 
 union SearchFilter {
-    char keyword[MAX_NAME_LEN];
+    char keyword[INST_MAX_NAME_LEN];
     int minScore;
 };
 
@@ -127,11 +127,11 @@ static int parse_instructor_line(const char line[], struct Instructor *inst) {
     return 0;
 }
 
-# Login Part
+/* Login Part */
 
 int instructorLogin(char currentId[], char currentName[]) {
-    char inputId[MAX_ID_LEN];
-    char inputName[MAX_NAME_LEN];
+    char inputId[INST_MAX_ID_LEN];
+    char inputName[INST_MAX_NAME_LEN];
     char line[256];
     struct Instructor inst;
     FILE *fp;
@@ -196,7 +196,7 @@ int instructorLogin(char currentId[], char currentName[]) {
     }
 }
 
-# Classes Management (Add / View / Search / Update)
+/* Classes Management (Add / View / Search / Update) */
 
 static void generate_next_class_id(char nextId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
@@ -362,7 +362,7 @@ static void search_class_schedule(void) {
 static void update_class_schedule(const char currentId[]) {
     FILE *fp, *tempFp;
     struct ClassSchedule cls;
-    char targetId[MAX_ID_LEN];
+    char targetId[INST_MAX_ID_LEN];
     int found = 0, unauthorized = 0;
 
     view_class_schedules(currentId);
@@ -386,7 +386,7 @@ static void update_class_schedule(const char currentId[]) {
             if (!inst_equals_ignore_case(cls.instructorId, currentId)) {
                 unauthorized = 1;
             } else {
-                char newName[MAX_NAME_LEN], newDate[MAX_DATE_LEN], newTime[MAX_TIME_LEN];
+                char newName[INST_MAX_NAME_LEN], newDate[INST_MAX_DATE_LEN], newTime[INST_MAX_TIME_LEN];
                 found = 1;
                 printf("\nUpdating [%s] (%s | %s %s)\n", cls.classId, cls.className, cls.date, cls.time);
 
@@ -466,7 +466,7 @@ static void class_schedule_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-# Facilities Problems Report
+/* Facilities Problems Report */
 
 static void generate_next_problem_id(char nextId[]) {
     FILE *fp = fopen(PROBLEM_FILE, "r");
@@ -615,7 +615,7 @@ static void facility_problem_menu(const char currentName[]) {
     } while (choice != 0);
 }
 
-# Instructor Ratings
+/* Instructor Ratings */
 
 static void view_instructor_ratings(const char currentId[]) {
     FILE *fp = fopen(RATING_FILE, "r");
@@ -727,7 +727,7 @@ static void instructor_rating_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-# Instructor's Main Menu
+/* Instructor's Main Menu */
 
 void instructorMenu(const char currentId[], const char currentName[]) {
     int choice;
