@@ -48,20 +48,30 @@ void foClearBuffer(void) {
 }
 
 /* Function: foReadString
- * Assumption: Pointer 'buffer' points to a valid character array of at least 
- * 'size' bytes, and user input does not exceed the defined buffer size. */
+ * Assumption: 'buffer' has at least 'size' bytes allocated.
+ * Rejects the '|' delimiter character to prevent pipe-delimited file corruption. */
 void foReadString(const char *prompt, char *buffer, int size) {
     size_t len;
-    printf("%s", prompt);
-    if (fgets(buffer, size, stdin) != NULL) {
-        len = strlen(buffer);
-        if (len > 0 && buffer[len - 1] == '\n') {
-            buffer[len - 1] = '\0';
-        } else {
-            foClearBuffer();
+    while (1) {
+        printf("%s", prompt);
+        if (fgets(buffer, size, stdin) != NULL) {
+            len = strlen(buffer);
+            if (len > 0 && buffer[len - 1] == '\n') {
+                buffer[len - 1] = '\0';
+            } else {
+                foClearBuffer();
+            }
+
+            /* Block '|' to protect pipe-delimited database files */
+            if (strchr(buffer, '|') != NULL) {
+                printf("[!] Invalid input: the '|' character is not allowed. Please try again.\n");
+                continue;
+            }
+            break;
         }
     }
 }
+
 
 /* Function: foValidateID
  * Assumption: All valid system primary keys strictly follow a 5-character 
@@ -181,6 +191,9 @@ void facilitiesOfficerMenu(void) {
  * to 'inventory.txt'. Equipment IDs are auto-generated sequentially to prevent
  * duplication, and items with quantity < LOW_STOCK_THRESHOLD (5) are tagged 'Low Stock'. */
 void addEquipment(void) {
+    char inputBuf[32];
+    char extra;
+
     Equipment eq;
     EquipmentMetric metric; /* Using Union (Requirement iv) */
     FILE *fp;
@@ -202,23 +215,19 @@ void addEquipment(void) {
     } while (strlen(eq.category) == 0);
 
     while (1) {
-        printf("Enter Quantity in Stock (>= 0): ");
-        if (scanf("%d", &eq.quantity) == 1 && eq.quantity >= 0) {
-            foClearBuffer();
+        foReadString("Enter Quantity in Stock (>= 0): ", inputBuf, sizeof(inputBuf));
+        if (sscanf(inputBuf, "%d %c", &eq.quantity, &extra) == 1 && eq.quantity >= 0) {
             break;
         }
-        printf("[!] Invalid quantity! Please enter a non-negative integer.\n");
-        foClearBuffer();
+        printf("[!] Invalid quantity! Please enter a valid quantity (non-negative integer).\n");
     }
 
     while (1) {
-        printf("Enter Unit Cost in RM (> 0.00): ");
-        if (scanf("%lf", &eq.unitCost) == 1 && eq.unitCost > 0.0) {
-            foClearBuffer();
+        foReadString("Enter Unit Cost in RM (> 0.00): ", inputBuf, sizeof(inputBuf));
+        if (sscanf(inputBuf, "%lf %c", &eq.unitCost, &extra) == 1 && eq.unitCost > 0.0) {
             break;
         }
-        printf("[!] Invalid unit cost! Please enter a positive amount.\n");
-        foClearBuffer();
+        printf("[!] Invalid unit cost! Please enter a valid unit cost (positive decimal).\n");
     }
 
     if (eq.quantity < LOW_STOCK_THRESHOLD) {
@@ -299,6 +308,9 @@ void searchEquipment(void) {
  * Assumption: Equipment IDs and Names are immutable once registered; only 
  * Quantity, Unit Cost, and Condition Status can be updated via temp file replacement. */
 void updateEquipment(void) {
+    char inputBuf[32];
+    char extra;
+
     FILE *fp = fopen(INVENTORY_FILE, "r");
     FILE *tempFp = fopen(FO_TEMP_FILE, "w");
     Equipment eq;
@@ -356,8 +368,10 @@ void viewFacilityProblems(void) {
     printf("------------------------------------------------------------------------------------------------------------\n");
     printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", "PROB ID", "Facility", "Issue Description", "Reported By", "Date", "Status");
     printf("------------------------------------------------------------------------------------------------------------\n");
-    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported, prob.status) == 6) {
-        printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported, prob.status);
+    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, 
+        prob.reportedBy, prob.dateReported, prob.status) == 6) {
+        printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, 
+            prob.dateReported, prob.status);
         count++;
     }
     printf("------------------------------------------------------------------------------------------------------------\n");
@@ -383,9 +397,11 @@ void searchFacilityProblems(void) {
     printf("------------------------------------------------------------------------------------------------------------\n");
     printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", "PROB ID", "Facility", "Issue Description", "Reported By", "Date", "Status");
     printf("------------------------------------------------------------------------------------------------------------\n");
-    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported, prob.status) == 6) {
+    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, 
+        prob.dateReported, prob.status) == 6) {
         if (strcmp(prob.problemID, keyword) == 0 || strcmp(prob.status, keyword) == 0) {
-            printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported, prob.status);
+            printf("%-7s | %-16s | %-32s | %-13s | %-11s | %-12s\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, 
+                prob.dateReported, prob.status);
             found++;
         }
     }
@@ -410,7 +426,8 @@ void updateProblemStatus(void) {
         if (fp) fclose(fp); if (tempFp) fclose(tempFp); return;
     }
     foReadString("Enter Problem ID to update (e.g., FP001): ", targetID, FO_MAX_ID);
-    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported, prob.status) == 6) {
+    while (fscanf(fp, "%9[^|]|%49[^|]|%99[^|]|%49[^|]|%14[^|]|%19[^\n]\n", prob.problemID, prob.facilityName, prob.description, prob.reportedBy, prob.dateReported,
+         prob.status) == 6) {
         if (strcmp(prob.problemID, targetID) == 0) {
             found = 1;
             printf("\n[Issue Found!]\nFacility: %s | Description: %s | Current Status: %s\n\n", prob.facilityName, prob.description, prob.status);
@@ -452,7 +469,8 @@ void generateStockReport(void) {
         printf("[i] No inventory data available to generate report.\n");
         return;
     }
-    printf("Report Filter Options:\n  1. Complete Report\n  2. Filter by ID or Name\n  3. Show Low-Stock Items (< %d units)\nSelect filter (1-3): ", LOW_STOCK_THRESHOLD);
+    printf("Report Filter Options:\n  1. Complete Report\n  2. Filter by ID or Name\n  3. Show Low-Stock Items (< %d units)\nSelect filter (1-3): ", 
+        LOW_STOCK_THRESHOLD);
     if (scanf("%d", &filterOption) != 1 || filterOption < 1 || filterOption > 3) {
         printf("[!] Invalid selection. Defaulting to Complete Report.\n"); filterOption = 1;
     }
@@ -470,7 +488,8 @@ void generateStockReport(void) {
 
         metric.itemValuation = eq.quantity * eq.unitCost;
         alertFlag = (eq.quantity < LOW_STOCK_THRESHOLD) ? "[! LOW STOCK !]" : "OK";
-        printf("%-8s | %-20s | %-10s | %-6d | %-9.2f | %-11.2f | %-16s\n", eq.equipmentID, eq.name, eq.category, eq.quantity, eq.unitCost, metric.itemValuation, alertFlag);
+        printf("%-8s | %-20s | %-10s | %-6d | %-9.2f | %-11.2f | %-16s\n", eq.equipmentID, eq.name, eq.category, eq.quantity, eq.unitCost, 
+            metric.itemValuation, alertFlag);
 
         totalItems += eq.quantity;
         totalValuation += metric.itemValuation;
