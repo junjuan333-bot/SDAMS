@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 #include "student.h"
 
 #define MAX_ID 20
@@ -12,18 +13,28 @@
 #define MAX_DATE 20
 #define MAX_REASON 100
 #define MAX_LINE 256
+#define MAX_PASS 30
 
 #define STUDENT_FILE "students.txt"
-#define INSTRUCTOR_FILE "instructor.txt"
+#define INSTRUCTOR_FILE "instructors.txt"
 #define CLASS_FILE "classes.txt"
 #define BOOKING_FILE "bookings.txt"
 #define PAYMENT_FILE "payments.txt"
 #define REFUND_FILE "refund_requests.txt"
 #define RATING_FILE "ratings.txt"
 
+struct checkbuff {
+    int charactrer;
+};
+
+union LoginInput {
+    char inputId[MAX_ID];
+    int tempCode; 
+};
+
 static void clearInputBuffer(void) {
-    int ch;
-    while ((ch = getchar()) != '\n' && ch != EOF) {
+    struct checkbuff buffercase;
+    while ((buffercase.charactrer = getchar()) != '\n' && buffercase.charactrer != EOF) {
     }
 }
 
@@ -42,9 +53,7 @@ static int readIntInRange(int minVal, int maxVal, int *outVal) {
 }
 
 static int equalsIgnoreCase(const char *a, const char *b) {
-    if (a == NULL || b == NULL) {
-        return 0;
-    }
+
     while (*a != '\0' && *b != '\0') {
         if (tolower((unsigned char)*a) != tolower((unsigned char)*b)) {
             return 0;
@@ -114,19 +123,15 @@ static void displayActiveBookings(const char *studentId) {
 
     if (!found) {
         printf("You have no active bookings.\n");
+        return;
     }
 }
 
-static void displayAvailableClasses(void) {
+static int displayAvailableClasses(void) {
     FILE *classFp = fopen(CLASS_FILE, "r");
     if (classFp == NULL) {
         printf("Notice: '%s' not found yet. Creating an empty file for setup.\n", CLASS_FILE);
-        classFp = fopen(CLASS_FILE, "a+");
-        if (classFp == NULL) {
-            printf("Error: Unable to access class data file.\n");
-            return;
-        }
-        rewind(classFp);
+        return 0;
     }
 
     printf("\n--- Available Classes ---\n");
@@ -140,9 +145,34 @@ static void displayAvailableClasses(void) {
 
     if (!hasClass) {
         printf("No classes available currently.\n");
+        return 0;
     }
+    return 1;
 }
 
+static int hasAnyInstructors(void) {
+    FILE *fp = fopen(INSTRUCTOR_FILE, "r");
+    if (fp == NULL) {
+        printf("No instructors available currently.\n");
+        return 0;
+    }
+
+    char line[MAX_LINE];
+    int count = 0;
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        char id[MAX_ID], name[MAX_NAME], style[MAX_STYLE], contact[MAX_PHONE], status[MAX_STATUS];
+        if (sscanf(line, "%19s %49s %29s %29s %19s", id, name, style, contact, status) == 5) {
+            count++;
+        }
+    }
+    fclose(fp);
+
+    if (count == 0) {
+        printf("No instructors available currently.\n");
+    }
+
+    return count > 0;
+}
 static void displayAllInstructors(void) {
     FILE *fp = fopen(INSTRUCTOR_FILE, "r");
     if (fp == NULL) {
@@ -163,9 +193,6 @@ static void displayAllInstructors(void) {
     }
     fclose(fp);
 
-    if (count == 0) {
-        printf("No instructors found in '%s'.\n", INSTRUCTOR_FILE);
-    }
 }
 
 static int lookupInstructorInfo(const char *targetInstructorId,
@@ -231,37 +258,42 @@ static float calcInstructorAvg(const char *targetInstructorId, int *outCount) {
     return (float)(sum / count);
 }
 
-static void generateNextPaymentId(char *outId, size_t outSize) {
+static int generateNextPaymentId(char *outId, size_t outSize) {
     int maxNum = 5000;
     FILE *fp = fopen(PAYMENT_FILE, "r");
-    if (fp != NULL) {
-        char line[MAX_LINE];
-        while (fgets(line, sizeof(line), fp) != NULL) {
-            char pId[MAX_ID], sId[MAX_ID], date[MAX_DATE];
-            double amount;
-            if (sscanf(line, "%19s %19s %lf %19s", pId, sId, &amount, date) == 4) {
-                int allDigits = 1;
-                size_t len = strlen(pId);
-                if (len == 0) {
+    if (fp == NULL) {
+        printf("Error: '%s' not found. Cannot generate Payment ID.\n", PAYMENT_FILE);
+        return 0; 
+    }
+
+    char line[MAX_LINE];
+    while (fgets(line, sizeof(line), fp) != NULL) {
+        char pId[MAX_ID], sId[MAX_ID], date[MAX_DATE];
+        double amount;
+        if (sscanf(line, "%19s %19s %lf %19s", pId, sId, &amount, date) == 4) {
+            int allDigits = 1;
+            size_t len = strlen(pId);
+            if (len == 0) {
+                allDigits = 0;
+            }
+            for (size_t i = 0; i < len; i++) {
+                if (pId[i] < '0' || pId[i] > '9') {
                     allDigits = 0;
+                    break;
                 }
-                for (size_t i = 0; i < len; i++) {
-                    if (pId[i] < '0' || pId[i] > '9') {
-                        allDigits = 0;
-                        break;
-                    }
-                }
-                if (allDigits) {
-                    int num = atoi(pId);
-                    if (num > maxNum) {
-                        maxNum = num;
-                    }
+            }
+            if (allDigits) {
+                int num = atoi(pId);
+                if (num > maxNum) {
+                    maxNum = num;
                 }
             }
         }
-        fclose(fp);
     }
+    fclose(fp);
+
     snprintf(outId, outSize, "%d", maxNum + 1);
+    return 1;
 }
 
 static void generateNextRefundId(char *outId, size_t outSize) {
@@ -272,31 +304,22 @@ static void generateNextRefundId(char *outId, size_t outSize) {
         while (fgets(line, sizeof(line), fp) != NULL) {
             char rId[MAX_ID], pId[MAX_ID], name[MAX_NAME], reason[MAX_REASON], status[MAX_STATUS];
             double amount;
-            if (sscanf(line, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\r\n]",
-                       rId, pId, name, &amount, reason, status) == 6) {
-                if ((rId[0] == 'R' || rId[0] == 'r') && rId[1] != '\0') {
-                    int allDigits = 1;
-                    for (size_t i = 1; rId[i] != '\0'; i++) {
-                        if (rId[i] < '0' || rId[i] > '9') {
-                            allDigits = 0;
-                            break;
-                        }
-                    }
-                    if (allDigits) {
-                        int num = atoi(rId + 1);
-                        if (num > maxNum) {
-                            maxNum = num;
-                        }
-                    }
-                }
-            }
+            sscanf(line, "%19[^|]|%19[^|]|%49[^|]|%lf|%99[^|]|%19[^\r\n]",
+                       rId, pId, name, &amount, reason, status); 
+                    
+            int num = atoi(rId + 1);
+            if (num > maxNum) {
+                maxNum = num;}
+                    
         }
         fclose(fp);
     }
     snprintf(outId, outSize, "R%03d", maxNum + 1);
 }
 
-int studentLogin(char *studentIdInput, char *outStudentId, char *outName,
+
+int studentLogin(const char *studentIdInput, const char *passwordInput,
+                 char *outStudentId, char *outName,
                  char *outStyle, char *outContact, char *outStatus) {
     FILE *fp = fopen(STUDENT_FILE, "r");
     if (fp == NULL) {
@@ -306,24 +329,36 @@ int studentLogin(char *studentIdInput, char *outStudentId, char *outName,
 
     char line[MAX_LINE];
     while (fgets(line, sizeof(line), fp) != NULL) {
-        char id[MAX_ID], name[MAX_NAME], style[MAX_STYLE], contact[MAX_PHONE], status[MAX_STATUS];
-        if (sscanf(line, "%19s %49s %29s %29s %19s", id, name, style, contact, status) == 5) {
+        char id[MAX_ID], name[MAX_NAME], style[MAX_STYLE],
+             contact[MAX_PHONE], status[MAX_STATUS], password[MAX_PASS];
+
+        if (sscanf(line, "%19s %49s %29s %29s %19s %29s",
+                   id, name, style, contact, status, password) == 6) {
             if (strcmp(id, studentIdInput) == 0) {
                 fclose(fp);
+
+                if (strcmp(password, passwordInput) != 0) {
+                    printf("Invalid password for Student ID '%s'.\n", id);
+                    return 0;
+                }
+
                 if (strcmp(status, "Active") != 0) {
                     printf("Account for Student ID '%s' is not active (Status: %s).\n", id, status);
                     return 0;
                 }
+
                 if (outStudentId != NULL) strcpy(outStudentId, id);
                 if (outName != NULL) strcpy(outName, name);
                 if (outStyle != NULL) strcpy(outStyle, style);
                 if (outContact != NULL) strcpy(outContact, contact);
                 if (outStatus != NULL) strcpy(outStatus, status);
+
                 printf("\nLogin successful! Welcome, %s.\n", name);
                 return 1;
             }
         }
     }
+
 
     fclose(fp);
     printf("Student ID '%s' not found in '%s'.\n", studentIdInput, STUDENT_FILE);
@@ -331,18 +366,38 @@ int studentLogin(char *studentIdInput, char *outStudentId, char *outName,
 }
 
 void studentMenu(void) {
-    char inputId[MAX_ID];
-    char studentId[MAX_ID], studentName[MAX_NAME], studentStyle[MAX_STYLE], studentContact[MAX_PHONE], studentStatus[MAX_STATUS];
+    union LoginInput user;
+    char passwordInput[MAX_PASS];
+    char studentId[MAX_ID], studentName[MAX_NAME], studentStyle[MAX_STYLE],
+         studentContact[MAX_PHONE], studentStatus[MAX_STATUS];
 
-    printf("\nEnter Student ID: ");
-    if (scanf("%19s", inputId) != 1) {
+    while (1) {
+        printf("\nEnter Student ID (or 'q' to quit): ");
+        if (scanf("%19s", user.inputId) != 1) {
+            clearInputBuffer();
+            return;
+        }
         clearInputBuffer();
-        return;
-    }
-    clearInputBuffer();
 
-    if (studentLogin(inputId, studentId, studentName, studentStyle, studentContact, studentStatus) == 1) {
-        studentPortal(studentId, studentName);
+        if (strcmp(user.inputId, "q") == 0 || strcmp(user.inputId, "Q") == 0) {
+            return;
+        }
+
+        printf("Enter Password: ");
+        if (scanf("%29s", passwordInput) != 1) {
+            clearInputBuffer();
+            return;
+        }
+        clearInputBuffer();
+
+        if (studentLogin(user.inputId, passwordInput,
+                         studentId, studentName, studentStyle,
+                         studentContact, studentStatus) == 1) {
+            studentPortal(studentId, studentName);
+            return;
+        }
+
+        printf("Please try again.\n");
     }
 }
 
@@ -414,18 +469,18 @@ void manageBookings(char *studentId) {
 }
 
 void bookClass(char *studentId) {
-    displayAvailableClasses();
+    
+
+    if (displayAvailableClasses() == 0) {
+    return; 
+}
 
     char targetClass[MAX_ID];
-    printf("Enter Class ID to book (or 'back' to return): ");
-    if (scanf("%19s", targetClass) != 1) {
-        clearInputBuffer();
-        return;
-    }
+    printf("Enter Class ID to book : ");
+    scanf("%19s", targetClass);
     clearInputBuffer();
-
-    if (strcmp(targetClass, "back") == 0) {
-        return;
+    for (size_t i = 0; targetClass[i] != '\0'; i++) {
+        targetClass[i] = (char)toupper((unsigned char)targetClass[i]);
     }
 
     FILE *bookFp = fopen(BOOKING_FILE, "a");
@@ -478,19 +533,20 @@ void rescheduleBooking(char *studentId) {
     }
 
     printf("\nEnter current booked Class ID to reschedule: ");
-    if (scanf("%19s", oldClassId) != 1) {
-        clearInputBuffer();
-        return;
-    }
+    scanf("%19s", oldClassId);
     clearInputBuffer();
 
     displayAvailableClasses();
     printf("\nEnter new Class ID: ");
-    if (scanf("%19s", newClassId) != 1) {
-        clearInputBuffer();
-        return;
-    }
+    scanf("%19s", newClassId);
     clearInputBuffer();
+
+    for (size_t i = 0; oldClassId[i] != '\0'; i++) {
+        oldClassId[i] = (char)toupper((unsigned char)oldClassId[i]);
+    }
+    for (size_t i = 0; newClassId[i] != '\0'; i++) {
+        newClassId[i] = (char)toupper((unsigned char)newClassId[i]);
+    }
 
     FILE *fp = fopen(BOOKING_FILE, "r");
     if (fp == NULL) {
@@ -546,11 +602,10 @@ void cancelBooking(char *studentId) {
     }
 
     printf("\nEnter Class ID to cancel: ");
-    if (scanf("%19s", targetClassId) != 1) {
-        clearInputBuffer();
-        return;
-    }
+    scanf("%19s", targetClassId);
     clearInputBuffer();
+    
+ 
 
     FILE *fp = fopen(BOOKING_FILE, "r");
     if (fp == NULL) {
@@ -633,7 +688,9 @@ void makePayment(char *studentId) {
     double amount;
     char date[MAX_DATE];
 
-    generateNextPaymentId(paymentId, sizeof(paymentId));
+    if (!generateNextPaymentId(paymentId, sizeof(paymentId))) {
+        return;
+    }
 
     printf("\n--- Make Payment ---\n");
     printf("Generated Payment ID: %s\n", paymentId);
@@ -646,12 +703,13 @@ void makePayment(char *studentId) {
     }
     clearInputBuffer();
 
-    printf("Enter payment date (YYYY-MM-DD, e.g. 2026-11-01): ");
-    if (scanf("%19s", date) != 1) {
-        clearInputBuffer();
+    time_t now = time(NULL);
+    struct tm *localTime = localtime(&now);
+    if (localTime == NULL) {
+        printf("Error: Unable to get current system date.\n");
         return;
     }
-    clearInputBuffer();
+    strftime(date, sizeof(date), "%Y-%m-%d", localTime);
 
     FILE *payFp = fopen(PAYMENT_FILE, "a");
     if (payFp == NULL) {
@@ -703,10 +761,8 @@ void requestRefund(char *studentId, char *studentName) {
     printf("\n--- Request a Refund ---\n");
     viewPaymentHistory(studentId);
     printf("\nEnter Payment/Bill ID to refund (e.g. 5001): ");
-    if (scanf("%19s", paymentId) != 1) {
-        clearInputBuffer();
-        return;
-    }
+    scanf("%19s", paymentId);
+    
     clearInputBuffer();
 
     FILE *payFp = fopen(PAYMENT_FILE, "r");
@@ -736,7 +792,7 @@ void requestRefund(char *studentId, char *studentName) {
         return;
     }
 
-    generateNextRefundId(refundId, sizeof(refundId));
+    generateNexrtRefundId(refundId, sizeof(refundId));
     printf("Generated Refund ID: %s\n", refundId);
 
     printf("Enter refund reason: ");
@@ -823,6 +879,10 @@ void rateInstructor(char *studentId) {
     printf("\n--- Rate Instructor ---\n");
     displayAllInstructors();
 
+    if (!hasAnyInstructors()) {
+        return;
+    }
+
     printf("\nEnter Instructor ID: ");
     if (scanf("%19s", instructorId) != 1) {
         clearInputBuffer();
@@ -838,6 +898,8 @@ void rateInstructor(char *studentId) {
     if (strcmp(instStatus, "Active") != 0) {
         printf("Notice: Instructor %s (%s) is currently '%s'.\n",
                instructorId, instName, instStatus);
+
+        return;
     }
 
     printf("Enter rating score for %s (%s) [1.0 to 5.0]: ", instName, instStyle);
