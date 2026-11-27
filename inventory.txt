@@ -1,1 +1,9 @@
-EQ001|Karate Mats|Mats|3|12.00|Active
+EQ001|Karate Mats|Mats|12|150.00|Available
+EQ002|Boxing Gloves|Gear|8|90.00|Available
+EQ003|Taekwondo Uniforms|Uniforms|15|120.00|Available
+EQ004|Wooden Bo Staff|Weapons|4|65.00|Low Stock
+EQ005|Kick Shields|Gear|8|110.00|Available
+EQ006|Headgear Protectors|Gear|2|95.00|Low Stock
+EQ007|Judo Mats|Mats|10|180.00|Available
+EQ008|Rubber Knife|Weapons|6|25.00|Damaged
+EQ009|Karate Mats|Mats|10|30.00|Available

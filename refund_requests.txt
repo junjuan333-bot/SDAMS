@@ -2,3 +2,4 @@ R001|201|JunHee|180.00|Schedule conflict|Pending
 R002|203|Jadrian|200.00|Relocating to Penang|Pending
 R003|205|Kevin|150.00|Medical injury|Approved
 R004|202|Kenneth|300.00|Double payment|Rejected
+R005|5001|JunHee|180.00|suka hati|Pending
