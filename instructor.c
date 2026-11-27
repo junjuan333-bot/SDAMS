@@ -2,8 +2,10 @@
  * File: instructor.c
  * Module: Instructor Module - Self Defence Academy Management System (SDAMS)
  * Description: Implements instructor login, class schedule management,
- *              facility problem reporting, and rating viewing.
+ *              student booking approval/rejection, facility problem reporting,
+ *              and rating viewing/searching.
  */
+
 #include "instructor.h"
 
 #define INST_MAX_ID_LEN 20
@@ -15,9 +17,16 @@
 
 #define INSTRUCTOR_FILE "instructors.txt"
 #define CLASS_FILE "classes.txt"
+#define BOOKING_FILE "bookings.txt"
 #define PROBLEM_FILE "facility_problems.txt"
 #define RATING_FILE "ratings.txt"
-#define TEMP_FILE "temp_instructor.txt"
+#define TEMP_CLASS_FILE "temp_instructor_classes.txt"
+#define TEMP_BOOKING_FILE "temp_instructor_bookings.txt"
+
+/* Booking status codes: 1 = Pending, 2 = Approved, 3 = Rejected */
+#define BOOKING_STATUS_PENDING 1
+#define BOOKING_STATUS_APPROVED 2
+#define BOOKING_STATUS_REJECTED 3
 
 struct Instructor {
     char id[INST_MAX_ID_LEN];
@@ -35,13 +44,21 @@ struct ClassSchedule {
     char time[INST_MAX_TIME_LEN];
 };
 
+struct ClassBooking {
+    char bookingId[INST_MAX_ID_LEN];
+    char studentId[INST_MAX_ID_LEN];
+    char classId[INST_MAX_ID_LEN];
+    char bookingDate[INST_MAX_DATE_LEN];
+    int status;
+};
+
 struct FacilityProblem {
     char problemID[INST_MAX_ID_LEN];
+    char facilityName[INST_MAX_NAME_LEN];
     char description[INST_MAX_DESC_LEN];
-    char status[INST_MAX_STATUS_LEN];
     char reportedBy[INST_MAX_NAME_LEN];
     char reportedDate[INST_MAX_DATE_LEN];
-    char facilityName[INST_MAX_NAME_LEN];
+    char status[INST_MAX_STATUS_LEN];
 };
 
 struct InstructorRating {
@@ -58,9 +75,13 @@ union SearchFilter {
     int minScore;
 };
 
+/* ==================== Utility Functions ==================== */
+
 static void inst_clear_buffer(void) {
     int c;
-    while ((c = getchar()) != '\n' && c != EOF);
+    while ((c = getchar()) != '\n' && c != EOF) {
+        /* discard remaining input */
+    }
 }
 
 static void inst_trim_spaces(char str[]) {
@@ -68,16 +89,24 @@ static void inst_trim_spaces(char str[]) {
     int end = (int)strlen(str) - 1;
     int i = 0;
 
-    while (str[start] != '\0' && isspace((unsigned char)str[start])) start++;
-    while (end >= start && isspace((unsigned char)str[end])) end--;
-    while (start <= end) str[i++] = str[start++];
+    while (str[start] != '\0' && isspace((unsigned char)str[start])) {
+        start++;
+    }
+    while (end >= start && isspace((unsigned char)str[end])) {
+        end--;
+    }
+    while (start <= end) {
+        str[i++] = str[start++];
+    }
     str[i] = '\0';
 }
 
 static int inst_equals_ignore_case(const char s1[], const char s2[]) {
     int i = 0;
     while (s1[i] != '\0' && s2[i] != '\0') {
-        if (tolower((unsigned char)s1[i]) != tolower((unsigned char)s2[i])) return 0;
+        if (tolower((unsigned char)s1[i]) != tolower((unsigned char)s2[i])) {
+            return 0;
+        }
         i++;
     }
     return (s1[i] == '\0' && s2[i] == '\0');
@@ -93,11 +122,27 @@ static int inst_contains_ignore_case(const char haystack[], const char needle[])
 
     for (i = 0; i <= hLen - nLen; i++) {
         for (j = 0; j < nLen; j++) {
-            if (tolower((unsigned char)haystack[i + j]) != tolower((unsigned char)needle[j])) break;
+            if (tolower((unsigned char)haystack[i + j]) != tolower((unsigned char)needle[j])) {
+                break;
+            }
         }
         if (j == nLen) return 1;
     }
     return 0;
+}
+
+static int is_valid_date_format(const char date[]) {
+    int y, m, d;
+    if (strlen(date) != 10 || date[4] != '-' || date[7] != '-') return 0;
+    if (sscanf(date, "%4d-%2d-%2d", &y, &m, &d) != 3) return 0;
+    return (y >= 2020 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31);
+}
+
+static int is_valid_time_format(const char timeStr[]) {
+    int h, m;
+    if (strlen(timeStr) != 5 || timeStr[2] != ':') return 0;
+    if (sscanf(timeStr, "%2d:%2d", &h, &m) != 2) return 0;
+    return (h >= 0 && h <= 23 && m >= 0 && m <= 59);
 }
 
 static int parse_instructor_line(const char line[], struct Instructor *inst) {
@@ -127,7 +172,38 @@ static int parse_instructor_line(const char line[], struct Instructor *inst) {
     return 0;
 }
 
-/* Login Part */
+static int is_instructor_class(const char classId[], const char currentId[]) {
+    FILE *fp = fopen(CLASS_FILE, "r");
+    struct ClassSchedule cls;
+    int owned = 0;
+
+    if (fp == NULL) return 0;
+
+    while (fscanf(fp, "%19[^,],%49[^,],%19[^,],%19[^,],%9[^\n]\n",
+                  cls.classId, cls.className, cls.instructorId, cls.date, cls.time) == 5) {
+        inst_trim_spaces(cls.classId);
+        inst_trim_spaces(cls.instructorId);
+        if (inst_equals_ignore_case(cls.classId, classId) &&
+            inst_equals_ignore_case(cls.instructorId, currentId)) {
+            owned = 1;
+            break;
+        }
+    }
+
+    fclose(fp);
+    return owned;
+}
+
+static const char *get_booking_status_label(int status) {
+    switch (status) {
+        case BOOKING_STATUS_PENDING:  return "Pending";
+        case BOOKING_STATUS_APPROVED: return "Approved";
+        case BOOKING_STATUS_REJECTED: return "Rejected";
+        default:                      return "Unknown";
+    }
+}
+
+/* ==================== 1. Instructor Login ==================== */
 
 int instructorLogin(char currentId[], char currentName[]) {
     char inputId[INST_MAX_ID_LEN];
@@ -135,7 +211,7 @@ int instructorLogin(char currentId[], char currentName[]) {
     char line[256];
     struct Instructor inst;
     FILE *fp;
-    int authenticated = 0;
+    int authenticated;
 
     while (1) {
         printf("\n========================================\n");
@@ -171,7 +247,8 @@ int instructorLogin(char currentId[], char currentName[]) {
         authenticated = 0;
         while (fgets(line, sizeof(line), fp) != NULL) {
             if (parse_instructor_line(line, &inst)) {
-                if (inst_equals_ignore_case(inst.id, inputId) && inst_equals_ignore_case(inst.name, inputName)) {
+                if (inst_equals_ignore_case(inst.id, inputId) &&
+                    inst_equals_ignore_case(inst.name, inputName)) {
                     if (inst_equals_ignore_case(inst.status, "Active")) {
                         authenticated = 1;
                     } else {
@@ -196,16 +273,18 @@ int instructorLogin(char currentId[], char currentName[]) {
     }
 }
 
-/* Classes Management (Add / View / Search / Update) */
+/* ==================== 2. Class Schedule Management ==================== */
 
 static void generate_next_class_id(char nextId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
     struct ClassSchedule temp;
-    int maxNum = 100, num = 0;
+    int maxNum = 100;
+    int num = 0;
 
     if (fp != NULL) {
         while (fscanf(fp, "%19[^,],%49[^,],%19[^,],%19[^,],%9[^\n]\n",
                       temp.classId, temp.className, temp.instructorId, temp.date, temp.time) == 5) {
+            inst_trim_spaces(temp.classId);
             if (sscanf(temp.classId, "C%d", &num) == 1 || sscanf(temp.classId, "c%d", &num) == 1) {
                 if (num > maxNum) maxNum = num;
             }
@@ -213,20 +292,6 @@ static void generate_next_class_id(char nextId[]) {
         fclose(fp);
     }
     sprintf(nextId, "C%03d", maxNum + 1);
-}
-
-static int is_valid_date_format(const char date[]) {
-    int y, m, d;
-    if (strlen(date) != 10 || date[4] != '-' || date[7] != '-') return 0;
-    if (sscanf(date, "%4d-%2d-%2d", &y, &m, &d) != 3) return 0;
-    return (y >= 2020 && y <= 2100 && m >= 1 && m <= 12 && d >= 1 && d <= 31);
-}
-
-static int is_valid_time_format(const char timeStr[]) {
-    int h, m;
-    if (strlen(timeStr) != 5 || timeStr[2] != ':') return 0;
-    if (sscanf(timeStr, "%2d:%2d", &h, &m) != 2) return 0;
-    return (h >= 0 && h <= 23 && m >= 0 && m <= 59);
 }
 
 static void add_class_schedule(const char currentId[]) {
@@ -240,9 +305,13 @@ static void add_class_schedule(const char currentId[]) {
 
     while (1) {
         printf("Enter Class Name (no commas, or 0 to cancel): ");
-        if (scanf("%49[^\n]", newClass.className) != 1) { inst_clear_buffer(); continue; }
+        if (scanf("%49[^\n]", newClass.className) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(newClass.className);
+
         if (strcmp(newClass.className, "0") == 0) return;
         if (strlen(newClass.className) == 0 || strchr(newClass.className, ',') != NULL) {
             printf("[Error] Class name cannot be empty or contain commas (',').\n");
@@ -253,9 +322,13 @@ static void add_class_schedule(const char currentId[]) {
 
     while (1) {
         printf("Enter Date (YYYY-MM-DD, e.g. 2026-11-28): ");
-        if (scanf("%19[^\n]", newClass.date) != 1) { inst_clear_buffer(); continue; }
+        if (scanf("%19[^\n]", newClass.date) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(newClass.date);
+
         if (!is_valid_date_format(newClass.date)) {
             printf("[Error] Invalid date format. Use YYYY-MM-DD.\n");
             continue;
@@ -265,9 +338,13 @@ static void add_class_schedule(const char currentId[]) {
 
     while (1) {
         printf("Enter Time (HH:MM 24-hour, e.g. 18:00): ");
-        if (scanf("%9[^\n]", newClass.time) != 1) { inst_clear_buffer(); continue; }
+        if (scanf("%9[^\n]", newClass.time) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(newClass.time);
+
         if (!is_valid_time_format(newClass.time)) {
             printf("[Error] Invalid time format. Use HH:MM.\n");
             continue;
@@ -280,9 +357,11 @@ static void add_class_schedule(const char currentId[]) {
         printf("[Error] Unable to open %s.\n", CLASS_FILE);
         return;
     }
+
     fprintf(fp, "%s,%s,%s,%s,%s\n",
             newClass.classId, newClass.className, newClass.instructorId, newClass.date, newClass.time);
     fclose(fp);
+
     printf("[OK] Class %s (%s) scheduled on %s at %s!\n",
            newClass.classId, newClass.className, newClass.date, newClass.time);
 }
@@ -290,7 +369,8 @@ static void add_class_schedule(const char currentId[]) {
 static void view_class_schedules(const char currentId[]) {
     FILE *fp = fopen(CLASS_FILE, "r");
     struct ClassSchedule cls;
-    int mode = 1, count = 0;
+    int mode = 1;
+    int count = 0;
 
     if (fp == NULL) {
         printf("\n[Info] No class schedule records found (%s missing).\n", CLASS_FILE);
@@ -298,7 +378,12 @@ static void view_class_schedules(const char currentId[]) {
     }
 
     printf("\nView Option: [1] My Classes Only (%s)  [2] All Academy Classes: ", currentId);
-    if (scanf("%d", &mode) != 1) { inst_clear_buffer(); mode = 1; } else { inst_clear_buffer(); }
+    if (scanf("%d", &mode) != 1) {
+        inst_clear_buffer();
+        mode = 1;
+    } else {
+        inst_clear_buffer();
+    }
 
     printf("\n===========================================================================\n");
     printf("%-10s | %-25s | %-13s | %-12s | %-8s\n",
@@ -307,11 +392,21 @@ static void view_class_schedules(const char currentId[]) {
 
     while (fscanf(fp, "%19[^,],%49[^,],%19[^,],%19[^,],%9[^\n]\n",
                   cls.classId, cls.className, cls.instructorId, cls.date, cls.time) == 5) {
-        if (mode == 1 && !inst_equals_ignore_case(cls.instructorId, currentId)) continue;
+        inst_trim_spaces(cls.classId);
+        inst_trim_spaces(cls.className);
+        inst_trim_spaces(cls.instructorId);
+        inst_trim_spaces(cls.date);
+        inst_trim_spaces(cls.time);
+
+        if (mode == 1 && !inst_equals_ignore_case(cls.instructorId, currentId)) {
+            continue;
+        }
+
         printf("%-10s | %-25s | %-13s | %-12s | %-8s\n",
                cls.classId, cls.className, cls.instructorId, cls.date, cls.time);
         count++;
     }
+
     printf("===========================================================================\n");
     printf("Total Displayed Classes: %d\n", count);
     fclose(fp);
@@ -321,18 +416,28 @@ static void search_class_schedule(void) {
     FILE *fp = fopen(CLASS_FILE, "r");
     struct ClassSchedule cls;
     union SearchFilter filter;
-    int searchBy, found = 0;
+    int searchBy;
+    int found = 0;
 
-    if (fp == NULL) { printf("\n[Error] Cannot open %s.\n", CLASS_FILE); return; }
+    if (fp == NULL) {
+        printf("\n[Error] Cannot open %s.\n", CLASS_FILE);
+        return;
+    }
 
     printf("\nSearch Class By: [1] Class ID  [2] Class Name  [3] Date (YYYY-MM-DD): ");
     if (scanf("%d", &searchBy) != 1 || searchBy < 1 || searchBy > 3) {
-        inst_clear_buffer(); fclose(fp); return;
+        inst_clear_buffer();
+        fclose(fp);
+        return;
     }
     inst_clear_buffer();
 
     printf("Enter search keyword: ");
-    if (scanf("%49[^\n]", filter.keyword) != 1) { inst_clear_buffer(); fclose(fp); return; }
+    if (scanf("%49[^\n]", filter.keyword) != 1) {
+        inst_clear_buffer();
+        fclose(fp);
+        return;
+    }
     inst_clear_buffer();
     inst_trim_spaces(filter.keyword);
 
@@ -344,6 +449,12 @@ static void search_class_schedule(void) {
     while (fscanf(fp, "%19[^,],%49[^,],%19[^,],%19[^,],%9[^\n]\n",
                   cls.classId, cls.className, cls.instructorId, cls.date, cls.time) == 5) {
         int match = 0;
+        inst_trim_spaces(cls.classId);
+        inst_trim_spaces(cls.className);
+        inst_trim_spaces(cls.instructorId);
+        inst_trim_spaces(cls.date);
+        inst_trim_spaces(cls.time);
+
         if (searchBy == 1 && inst_equals_ignore_case(cls.classId, filter.keyword)) match = 1;
         else if (searchBy == 2 && inst_contains_ignore_case(cls.className, filter.keyword)) match = 1;
         else if (searchBy == 3 && strcmp(cls.date, filter.keyword) == 0) match = 1;
@@ -354,7 +465,10 @@ static void search_class_schedule(void) {
             found++;
         }
     }
-    if (found == 0) printf("No matching class schedule found for '%s'.\n", filter.keyword);
+
+    if (found == 0) {
+        printf("No matching class schedule found for '%s'.\n", filter.keyword);
+    }
     printf("===========================================================================\n");
     fclose(fp);
 }
@@ -363,62 +477,92 @@ static void update_class_schedule(const char currentId[]) {
     FILE *fp, *tempFp;
     struct ClassSchedule cls;
     char targetId[INST_MAX_ID_LEN];
-    int found = 0, unauthorized = 0;
+    int found = 0;
+    int unauthorized = 0;
 
     view_class_schedules(currentId);
+
     printf("\nEnter Class ID to update (or 0 to cancel): ");
-    if (scanf("%19[^\n]", targetId) != 1) { inst_clear_buffer(); return; }
+    if (scanf("%19[^\n]", targetId) != 1) {
+        inst_clear_buffer();
+        return;
+    }
     inst_clear_buffer();
     inst_trim_spaces(targetId);
+
     if (strcmp(targetId, "0") == 0) return;
 
     fp = fopen(CLASS_FILE, "r");
-    tempFp = fopen(TEMP_FILE, "w");
+    tempFp = fopen(TEMP_CLASS_FILE, "w");
     if (fp == NULL || tempFp == NULL) {
-        if (fp) fclose(fp);
-        if (tempFp) fclose(tempFp);
+        if (fp != NULL) fclose(fp);
+        if (tempFp != NULL) fclose(tempFp);
+        printf("[Error] Unable to open class schedule files.\n");
         return;
     }
 
     while (fscanf(fp, "%19[^,],%49[^,],%19[^,],%19[^,],%9[^\n]\n",
                   cls.classId, cls.className, cls.instructorId, cls.date, cls.time) == 5) {
+        inst_trim_spaces(cls.classId);
+        inst_trim_spaces(cls.instructorId);
+
         if (inst_equals_ignore_case(cls.classId, targetId)) {
             if (!inst_equals_ignore_case(cls.instructorId, currentId)) {
                 unauthorized = 1;
             } else {
-                char newName[INST_MAX_NAME_LEN], newDate[INST_MAX_DATE_LEN], newTime[INST_MAX_TIME_LEN];
+                char newName[INST_MAX_NAME_LEN];
+                char newDate[INST_MAX_DATE_LEN];
+                char newTime[INST_MAX_TIME_LEN];
+
                 found = 1;
-                printf("\nUpdating [%s] (%s | %s %s)\n", cls.classId, cls.className, cls.date, cls.time);
+                printf("\nUpdating [%s] (%s | %s %s)\n",
+                       cls.classId, cls.className, cls.date, cls.time);
 
                 printf("New Class Name (enter '-' to keep current): ");
                 if (scanf("%49[^\n]", newName) == 1) {
                     inst_clear_buffer();
                     inst_trim_spaces(newName);
-                    if (strcmp(newName, "-") != 0 && strlen(newName) > 0 && strchr(newName, ',') == NULL)
+                    if (strcmp(newName, "-") != 0 && strlen(newName) > 0 && strchr(newName, ',') == NULL) {
                         strcpy(cls.className, newName);
-                } else { inst_clear_buffer(); }
+                    }
+                } else {
+                    inst_clear_buffer();
+                }
 
                 while (1) {
                     printf("New Date YYYY-MM-DD (enter '-' to keep current): ");
-                    if (scanf("%19[^\n]", newDate) != 1) { inst_clear_buffer(); continue; }
+                    if (scanf("%19[^\n]", newDate) != 1) {
+                        inst_clear_buffer();
+                        continue;
+                    }
                     inst_clear_buffer();
                     inst_trim_spaces(newDate);
                     if (strcmp(newDate, "-") == 0) break;
-                    if (is_valid_date_format(newDate)) { strcpy(cls.date, newDate); break; }
+                    if (is_valid_date_format(newDate)) {
+                        strcpy(cls.date, newDate);
+                        break;
+                    }
                     printf("[Error] Invalid date format.\n");
                 }
 
                 while (1) {
                     printf("New Time HH:MM (enter '-' to keep current): ");
-                    if (scanf("%9[^\n]", newTime) != 1) { inst_clear_buffer(); continue; }
+                    if (scanf("%9[^\n]", newTime) != 1) {
+                        inst_clear_buffer();
+                        continue;
+                    }
                     inst_clear_buffer();
                     inst_trim_spaces(newTime);
                     if (strcmp(newTime, "-") == 0) break;
-                    if (is_valid_time_format(newTime)) { strcpy(cls.time, newTime); break; }
+                    if (is_valid_time_format(newTime)) {
+                        strcpy(cls.time, newTime);
+                        break;
+                    }
                     printf("[Error] Invalid time format.\n");
                 }
             }
         }
+
         fprintf(tempFp, "%s,%s,%s,%s,%s\n",
                 cls.classId, cls.className, cls.instructorId, cls.date, cls.time);
     }
@@ -427,14 +571,14 @@ static void update_class_schedule(const char currentId[]) {
     fclose(tempFp);
 
     if (unauthorized) {
-        remove(TEMP_FILE);
+        remove(TEMP_CLASS_FILE);
         printf("[Access Denied] You can only update classes assigned to your ID (%s).\n", currentId);
     } else if (!found) {
-        remove(TEMP_FILE);
+        remove(TEMP_CLASS_FILE);
         printf("[Not Found] Class ID '%s' does not exist.\n", targetId);
     } else {
         remove(CLASS_FILE);
-        rename(TEMP_FILE, CLASS_FILE);
+        rename(TEMP_CLASS_FILE, CLASS_FILE);
         printf("[OK] Class schedule [%s] updated successfully!\n", targetId);
     }
 }
@@ -453,7 +597,12 @@ static void class_schedule_menu(const char currentId[]) {
         printf("--------------------------------------------\n");
         printf("Enter your choice: ");
 
-        if (scanf("%d", &choice) != 1) { inst_clear_buffer(); choice = -1; } else { inst_clear_buffer(); }
+        if (scanf("%d", &choice) != 1) {
+            inst_clear_buffer();
+            choice = -1;
+        } else {
+            inst_clear_buffer();
+        }
 
         switch (choice) {
             case 1: add_class_schedule(currentId); break;
@@ -466,12 +615,154 @@ static void class_schedule_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-/* Facilities Problems Report */
+/* ==================== 3. Student Class Booking Management ==================== */
+
+static void view_my_class_bookings(const char currentId[], int pendingOnly) {
+    FILE *fp = fopen(BOOKING_FILE, "r");
+    struct ClassBooking bk;
+    int count = 0;
+
+    if (fp == NULL) {
+        printf("\n[Info] No student booking records found (%s missing).\n", BOOKING_FILE);
+        return;
+    }
+
+    printf("\n===========================================================================\n");
+    printf("%-12s | %-12s | %-10s | %-14s | %-12s\n",
+           "Booking ID", "Student ID", "Class ID", "Booking Date", "Status");
+    printf("---------------------------------------------------------------------------\n");
+
+    while (fscanf(fp, "%19[^,],%19[^,],%19[^,],%19[^,],%d\n",
+                  bk.bookingId, bk.studentId, bk.classId, bk.bookingDate, &bk.status) == 5) {
+        inst_trim_spaces(bk.bookingId);
+        inst_trim_spaces(bk.studentId);
+        inst_trim_spaces(bk.classId);
+        inst_trim_spaces(bk.bookingDate);
+
+        if (!is_instructor_class(bk.classId, currentId)) continue;
+        if (pendingOnly && bk.status != BOOKING_STATUS_PENDING) continue;
+
+        printf("%-12s | %-12s | %-10s | %-14s | %-12s\n",
+               bk.bookingId, bk.studentId, bk.classId, bk.bookingDate,
+               get_booking_status_label(bk.status));
+        count++;
+    }
+
+    printf("===========================================================================\n");
+    printf("Total Displayed Bookings: %d\n", count);
+    fclose(fp);
+}
+
+static void process_class_booking(const char currentId[]) {
+    FILE *fp, *tempFp;
+    struct ClassBooking bk;
+    char targetBookingId[INST_MAX_ID_LEN];
+    int decision;
+    int found = 0;
+    int unauthorized = 0;
+
+    view_my_class_bookings(currentId, 1);
+
+    printf("\nEnter Booking ID to Approve/Reject (or 0 to cancel): ");
+    if (scanf("%19[^\n]", targetBookingId) != 1) {
+        inst_clear_buffer();
+        return;
+    }
+    inst_clear_buffer();
+    inst_trim_spaces(targetBookingId);
+
+    if (strcmp(targetBookingId, "0") == 0) return;
+
+    printf("Select Action: [1] Approve Booking  [2] Reject Booking: ");
+    if (scanf("%d", &decision) != 1 || (decision != 1 && decision != 2)) {
+        inst_clear_buffer();
+        printf("[Invalid] Action cancelled.\n");
+        return;
+    }
+    inst_clear_buffer();
+
+    fp = fopen(BOOKING_FILE, "r");
+    tempFp = fopen(TEMP_BOOKING_FILE, "w");
+    if (fp == NULL || tempFp == NULL) {
+        if (fp != NULL) fclose(fp);
+        if (tempFp != NULL) fclose(tempFp);
+        printf("[Error] Unable to open %s.\n", BOOKING_FILE);
+        return;
+    }
+
+    while (fscanf(fp, "%19[^,],%19[^,],%19[^,],%19[^,],%d\n",
+                  bk.bookingId, bk.studentId, bk.classId, bk.bookingDate, &bk.status) == 5) {
+        inst_trim_spaces(bk.bookingId);
+        inst_trim_spaces(bk.classId);
+
+        if (inst_equals_ignore_case(bk.bookingId, targetBookingId)) {
+            if (!is_instructor_class(bk.classId, currentId)) {
+                unauthorized = 1;
+            } else {
+                found = 1;
+                bk.status = (decision == 1) ? BOOKING_STATUS_APPROVED : BOOKING_STATUS_REJECTED;
+            }
+        }
+
+        fprintf(tempFp, "%s,%s,%s,%s,%d\n",
+                bk.bookingId, bk.studentId, bk.classId, bk.bookingDate, bk.status);
+    }
+
+    fclose(fp);
+    fclose(tempFp);
+
+    if (unauthorized) {
+        remove(TEMP_BOOKING_FILE);
+        printf("[Access Denied] Booking '%s' belongs to a class not assigned to you (%s).\n",
+               targetBookingId, currentId);
+    } else if (!found) {
+        remove(TEMP_BOOKING_FILE);
+        printf("[Not Found] Booking ID '%s' does not exist.\n", targetBookingId);
+    } else {
+        remove(BOOKING_FILE);
+        rename(TEMP_BOOKING_FILE, BOOKING_FILE);
+        printf("[OK] Booking [%s] has been %s!\n",
+               targetBookingId, (decision == 1) ? "APPROVED" : "REJECTED");
+    }
+}
+
+static void booking_management_menu(const char currentId[]) {
+    int choice;
+    do {
+        printf("\n--------------------------------------------\n");
+        printf("      CLASS BOOKING MANAGEMENT (%s)\n", currentId);
+        printf("--------------------------------------------\n");
+        printf("1. View Pending Class Bookings\n");
+        printf("2. View All My Class Bookings\n");
+        printf("3. Approve / Reject Student Booking\n");
+        printf("0. Back to Instructor Menu\n");
+        printf("--------------------------------------------\n");
+        printf("Enter your choice: ");
+
+        if (scanf("%d", &choice) != 1) {
+            inst_clear_buffer();
+            choice = -1;
+        } else {
+            inst_clear_buffer();
+        }
+
+        switch (choice) {
+            case 1: view_my_class_bookings(currentId, 1); break;
+            case 2: view_my_class_bookings(currentId, 0); break;
+            case 3: process_class_booking(currentId); break;
+            case 0: break;
+            default: printf("\n[Invalid] Please enter 0-3.\n");
+        }
+    } while (choice != 0);
+}
+
+/* ==================== 4. Facility Problems Report ==================== */
 
 static void generate_next_problem_id(char nextId[]) {
     FILE *fp = fopen(PROBLEM_FILE, "r");
     struct FacilityProblem temp;
-    int maxNum = 0, num = 0;
+    int maxNum = 0;
+    int num = 0;
 
     if (fp != NULL) {
         while (fscanf(fp, "%19[^|]|%49[^|]|%99[^|]|%49[^|]|%19[^|]|%19[^\n]\n",
@@ -507,14 +798,18 @@ static void add_facility_problem(const char currentName[]) {
     printf("Select Category: ");
 
     if (scanf("%d", &catChoice) != 1 || catChoice < 0 || catChoice > 6) {
-        inst_clear_buffer(); return;
+        inst_clear_buffer();
+        return;
     }
     inst_clear_buffer();
     if (catChoice == 0) return;
 
     while (1) {
         printf("Enter Facility / Room Name (e.g. Dojo Hall A, no '|'): ");
-        if (scanf("%49[^\n]", prob.facilityName) != 1) { inst_clear_buffer(); continue; }
+        if (scanf("%49[^\n]", prob.facilityName) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(prob.facilityName);
         if (strlen(prob.facilityName) == 0 || strchr(prob.facilityName, '|') != NULL) {
@@ -526,7 +821,10 @@ static void add_facility_problem(const char currentName[]) {
 
     while (1) {
         printf("Enter Specific Problem Details (no '|'): ");
-        if (scanf("%69[^\n]", detail) != 1) { inst_clear_buffer(); continue; }
+        if (scanf("%69[^\n]", detail) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(detail);
         if (strlen(detail) == 0 || strchr(detail, '|') != NULL) {
@@ -539,8 +837,11 @@ static void add_facility_problem(const char currentName[]) {
     sprintf(prob.description, "[%s] %s", categories[catChoice - 1], detail);
 
     while (1) {
-        printf("Enter Reported Date (DD-MM-YYYY, e.g. 24-11-2026): ");
-        if (scanf("%19[^\n]", prob.reportedDate) != 1) { inst_clear_buffer(); continue; }
+        printf("Enter Reported Date (DD-MM-YYYY, e.g. 28-11-2026): ");
+        if (scanf("%19[^\n]", prob.reportedDate) != 1) {
+            inst_clear_buffer();
+            continue;
+        }
         inst_clear_buffer();
         inst_trim_spaces(prob.reportedDate);
         if (strlen(prob.reportedDate) != 10 || prob.reportedDate[2] != '-' || prob.reportedDate[5] != '-') {
@@ -551,12 +852,16 @@ static void add_facility_problem(const char currentName[]) {
     }
 
     fp = fopen(PROBLEM_FILE, "a");
-    if (fp == NULL) { printf("[Error] Unable to open %s.\n", PROBLEM_FILE); return; }
+    if (fp == NULL) {
+        printf("[Error] Unable to open %s.\n", PROBLEM_FILE);
+        return;
+    }
 
     fprintf(fp, "%s|%s|%s|%s|%s|%s\n",
             prob.problemID, prob.facilityName, prob.description,
             prob.reportedBy, prob.reportedDate, prob.status);
     fclose(fp);
+
     printf("[OK] Facility problem %s logged! Status: %s\n", prob.problemID, prob.status);
 }
 
@@ -565,7 +870,10 @@ static void view_facility_problems(void) {
     struct FacilityProblem prob;
     int count = 0;
 
-    if (fp == NULL) { printf("\n[Info] No facility problem records found.\n"); return; }
+    if (fp == NULL) {
+        printf("\n[Info] No facility problem records found.\n");
+        return;
+    }
 
     printf("\n========================================================================================================\n");
     printf("%-8s | %-18s | %-34s | %-15s | %-12s | %-12s\n",
@@ -587,6 +895,7 @@ static void view_facility_problems(void) {
                prob.reportedBy, prob.reportedDate, prob.status);
         count++;
     }
+
     printf("========================================================================================================\n");
     printf("Total Facility Problems Listed: %d\n", count);
     fclose(fp);
@@ -604,7 +913,12 @@ static void facility_problem_menu(const char currentName[]) {
         printf("--------------------------------------------\n");
         printf("Enter your choice: ");
 
-        if (scanf("%d", &choice) != 1) { inst_clear_buffer(); choice = -1; } else { inst_clear_buffer(); }
+        if (scanf("%d", &choice) != 1) {
+            inst_clear_buffer();
+            choice = -1;
+        } else {
+            inst_clear_buffer();
+        }
 
         switch (choice) {
             case 1: add_facility_problem(currentName); break;
@@ -615,14 +929,18 @@ static void facility_problem_menu(const char currentName[]) {
     } while (choice != 0);
 }
 
-/* Instructor Ratings */
+/* ==================== 5. Instructor Ratings ==================== */
 
 static void view_instructor_ratings(const char currentId[]) {
     FILE *fp = fopen(RATING_FILE, "r");
     struct InstructorRating r;
-    int count = 0, totalScore = 0;
+    int count = 0;
+    int totalScore = 0;
 
-    if (fp == NULL) { printf("\n[Info] No rating records file (%s) found yet.\n", RATING_FILE); return; }
+    if (fp == NULL) {
+        printf("\n[Info] No rating records file (%s) found yet.\n", RATING_FILE);
+        return;
+    }
 
     printf("\n=================================================================================\n");
     printf("%-10s | %-10s | %-10s | %-7s | %-35s\n",
@@ -644,9 +962,14 @@ static void view_instructor_ratings(const char currentId[]) {
             count++;
         }
     }
+
     printf("=================================================================================\n");
-    if (count == 0) printf("No student ratings recorded for Instructor %s yet.\n", currentId);
-    else printf("Total Ratings: %d | Average Rating Score: %.2f / 5.00\n", count, (double)totalScore / count);
+    if (count == 0) {
+        printf("No student ratings recorded for Instructor %s yet.\n", currentId);
+    } else {
+        printf("Total Ratings: %d | Average Rating Score: %.2f / 5.00\n",
+               count, (double)totalScore / count);
+    }
     fclose(fp);
 }
 
@@ -654,25 +977,37 @@ static void search_instructor_ratings(const char currentId[]) {
     FILE *fp = fopen(RATING_FILE, "r");
     struct InstructorRating r;
     union SearchFilter filter;
-    int searchType, found = 0;
+    int searchType;
+    int found = 0;
 
-    if (fp == NULL) { printf("\n[Info] No rating records file (%s) found.\n", RATING_FILE); return; }
+    if (fp == NULL) {
+        printf("\n[Info] No rating records file (%s) found.\n", RATING_FILE);
+        return;
+    }
 
     printf("\nSearch Ratings By: [1] Class ID  [2] Minimum Score (1-5): ");
     if (scanf("%d", &searchType) != 1 || (searchType != 1 && searchType != 2)) {
-        inst_clear_buffer(); fclose(fp); return;
+        inst_clear_buffer();
+        fclose(fp);
+        return;
     }
     inst_clear_buffer();
 
     if (searchType == 1) {
         printf("Enter Class ID (e.g. C101): ");
-        if (scanf("%49[^\n]", filter.keyword) != 1) { inst_clear_buffer(); fclose(fp); return; }
+        if (scanf("%49[^\n]", filter.keyword) != 1) {
+            inst_clear_buffer();
+            fclose(fp);
+            return;
+        }
         inst_clear_buffer();
         inst_trim_spaces(filter.keyword);
     } else {
         printf("Enter Minimum Score (1-5): ");
         if (scanf("%d", &filter.minScore) != 1 || filter.minScore < 1 || filter.minScore > 5) {
-            inst_clear_buffer(); fclose(fp); return;
+            inst_clear_buffer();
+            fclose(fp);
+            return;
         }
         inst_clear_buffer();
     }
@@ -699,7 +1034,10 @@ static void search_instructor_ratings(const char currentId[]) {
             found++;
         }
     }
-    if (found == 0) printf("No matching ratings found.\n");
+
+    if (found == 0) {
+        printf("No matching ratings found.\n");
+    }
     printf("=================================================================================\n");
     fclose(fp);
 }
@@ -716,7 +1054,12 @@ static void instructor_rating_menu(const char currentId[]) {
         printf("--------------------------------------------\n");
         printf("Enter your choice: ");
 
-        if (scanf("%d", &choice) != 1) { inst_clear_buffer(); choice = -1; } else { inst_clear_buffer(); }
+        if (scanf("%d", &choice) != 1) {
+            inst_clear_buffer();
+            choice = -1;
+        } else {
+            inst_clear_buffer();
+        }
 
         switch (choice) {
             case 1: view_instructor_ratings(currentId); break;
@@ -727,7 +1070,7 @@ static void instructor_rating_menu(const char currentId[]) {
     } while (choice != 0);
 }
 
-/* Instructor's Main Menu */
+/* ==================== 6. Instructor Main Menu ==================== */
 
 void instructorMenu(const char currentId[], const char currentName[]) {
     int choice;
@@ -737,8 +1080,9 @@ void instructorMenu(const char currentId[], const char currentName[]) {
         printf("   SDAMS - INSTRUCTOR PORTAL (%s | %s)\n", currentId, currentName);
         printf("============================================\n");
         printf("1. Class Schedule Management\n");
-        printf("2. Issue Facility Problem\n");
-        printf("3. View Instructor Rating\n");
+        printf("2. Class Booking Management\n");
+        printf("3. Issue Facility Problem\n");
+        printf("4. View Instructor Rating\n");
         printf("0. Logout\n");
         printf("============================================\n");
         printf("Enter your choice: ");
@@ -752,10 +1096,11 @@ void instructorMenu(const char currentId[], const char currentName[]) {
 
         switch (choice) {
             case 1: class_schedule_menu(currentId); break;
-            case 2: facility_problem_menu(currentName); break;
-            case 3: instructor_rating_menu(currentId); break;
+            case 2: booking_management_menu(currentId); break;
+            case 3: facility_problem_menu(currentName); break;
+            case 4: instructor_rating_menu(currentId); break;
             case 0: printf("\nLogging out Instructor [%s - %s]...\n", currentId, currentName); break;
-            default: printf("\n[Invalid] Please select a valid option (0-3).\n");
+            default: printf("\n[Invalid] Please select a valid option (0-4).\n");
         }
     } while (choice != 0);
 }
