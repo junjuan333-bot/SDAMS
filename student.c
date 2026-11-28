@@ -792,7 +792,7 @@ void requestRefund(char *studentId, char *studentName) {
         return;
     }
 
-    generateNexrtRefundId(refundId, sizeof(refundId));
+    generateNextRefundId(refundId, sizeof(refundId));
     printf("Generated Refund ID: %s\n", refundId);
 
     printf("Enter refund reason: ");
